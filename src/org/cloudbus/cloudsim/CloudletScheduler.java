@@ -321,7 +321,7 @@ public abstract class CloudletScheduler {
 	 */
 	public Cloudlet getNextFinishedCloudlet() {
 		if (!getCloudletFinishedList().isEmpty()) {
-			return getCloudletFinishedList().removeFirst();
+			return getCloudletFinishedList().remove(0);
 		}
 		return null;
 	}
@@ -345,7 +345,7 @@ public abstract class CloudletScheduler {
 	 * @TODO: No clue why it's removing the first element
 	 */
 	public Cloudlet migrateCloudlet() {
-		Cloudlet cl = getCloudletExecList().removeFirst();
+		Cloudlet cl = getCloudletExecList().remove(0);
 		cl.finalizeCloudlet();
 		return cl;
 	}

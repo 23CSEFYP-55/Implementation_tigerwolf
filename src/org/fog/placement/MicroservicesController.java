@@ -206,13 +206,13 @@ public class MicroservicesController extends SimEntity {
 
     @Override
     public void processEvent(SimEvent ev) {
-        switch (ev.getTag()) {
-            case FogEvents.TRANSMIT_PR:
+        org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.TRANSMIT_PR) {
                 transmitPr(ev);
-            case FogEvents.CONTROLLER_RESOURCE_MANAGE:
+                    } else if (_tag_ == FogEvents.CONTROLLER_RESOURCE_MANAGE) {
                 manageResources();
-                break;
-            case FogEvents.STOP_SIMULATION:
+                
+                    } else if (_tag_ == FogEvents.STOP_SIMULATION) {
                 CloudSim.stopSimulation();
                 printTimeDetails();
                 printPowerDetails();
@@ -220,10 +220,11 @@ public class MicroservicesController extends SimEntity {
                 printNetworkUsageDetails();
                 printQoSDetails();
                 System.exit(0);
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + ev.getTag());
-        }
+                
+                    } else {
+                				// ignore unexpected events
+                }
+
 
     }
 

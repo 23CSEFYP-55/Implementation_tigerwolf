@@ -138,7 +138,7 @@ public abstract class BaseStatGenerator<T extends Cloudlet> implements IGenerato
     @Override
     public void notifyOfTime(final double time) {
         if ((startTime < 0 || startTime <= time) && (endTime < 0 || endTime >= time)
-                && (idealStartUpTimes.isEmpty() || idealStartUpTimes.getLast() < time)) {
+                && (idealStartUpTimes.isEmpty() || idealStartUpTimes.get(idealStartUpTimes.size() - 1) < time)) {
             idealStartUpTimes.offer(time);
         }
     }

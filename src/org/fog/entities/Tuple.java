@@ -13,6 +13,15 @@ public class Tuple extends Cloudlet{
 	public static final int ACTUATOR = 3;
 	
 	private String appId;
+
+	// --- Custom MOGS Matching Variables ---
+	public int priority = 1; // Default priority e.g., 1 (Low), 2 (Medium), 3 (High)
+	public java.util.List<Integer> preferredUAVs = new java.util.ArrayList<>();
+	public int currentProposalIndex = 0;
+	public Integer assignedUavId = null;
+	public double tupleDataSize = 1000.0; // Simulated data size for utility math
+	public double tupleCpuCycles = 2000.0; // Simulated CPU cycles for utility math
+	// --------------------------------------
 	
 	private String tupleType;
 	private String destModuleName;

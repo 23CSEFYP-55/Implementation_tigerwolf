@@ -1,0 +1,2 @@
+src\org\cloudbus\cloudsim\CloudletScheduler.java:324: return getCloudletFinishedList().removeFirst();
+src\org\cloudbus\cloudsim\CloudletScheduler.java:348: Cloudlet cl = getCloudletExecList().removeFirst();

@@ -68,34 +68,35 @@ public class MicroserviceFogDevice extends FogDevice {
 
     @Override
     protected void processOtherEvent(SimEvent ev) {
-        switch (ev.getTag()) {
-            case FogEvents.PROCESS_PRS:
+        org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.PROCESS_PRS) {
                 processPlacementRequests();
-                break;
-            case FogEvents.RECEIVE_PR:
+                
+                    } else if (_tag_ == FogEvents.RECEIVE_PR) {
                 addPlacementRequest((PlacementRequest) ev.getData());
-                break;
-            case FogEvents.UPDATE_SERVICE_DISCOVERY:
+                
+                    } else if (_tag_ == FogEvents.UPDATE_SERVICE_DISCOVERY) {
                 updateServiceDiscovery(ev);
-                break;
-            case FogEvents.TRANSMIT_PR:
+                
+                    } else if (_tag_ == FogEvents.TRANSMIT_PR) {
                 transmitPR((PlacementRequest) ev.getData());
-                break;
-            case FogEvents.MANAGEMENT_TUPLE_ARRIVAL:
+                
+                    } else if (_tag_ == FogEvents.MANAGEMENT_TUPLE_ARRIVAL) {
                 processManagementTuple(ev);
-                break;
-            case FogEvents.UPDATE_RESOURCE_INFO:
+                
+                    } else if (_tag_ == FogEvents.UPDATE_RESOURCE_INFO) {
                 updateResourceInfo(ev);
-                break;
-            case FogEvents.START_DYNAMIC_CLUSTERING:
+                
+                    } else if (_tag_ == FogEvents.START_DYNAMIC_CLUSTERING) {
                 //This message is received by the devices to start their clustering
                 processClustering(this.getParentId(), this.getId(), ev);
                 updateCLusterConsInRoutingTable();
-                break;
-            default:
+                
+                    } else {
                 super.processOtherEvent(ev);
-                break;
-        }
+                
+                }
+
     }
 
     private void updateResourceInfo(SimEvent ev) {

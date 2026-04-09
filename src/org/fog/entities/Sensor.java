@@ -118,17 +118,18 @@ public class Sensor extends SimEntity{
 
 	@Override
 	public void processEvent(SimEvent ev) {
-		switch(ev.getTag()){
-		case FogEvents.TUPLE_ACK:
+		org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.TUPLE_ACK) {
 			//transmit(transmitDistribution.getNextValue());
-			break;
-		case FogEvents.EMIT_TUPLE:
+			
+		        } else if (_tag_ == FogEvents.EMIT_TUPLE) {
 			transmit();
 			send(getId(), getTransmitDistribution().getNextValue(), FogEvents.EMIT_TUPLE);
-			break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + ev.getTag());
-        }
+			
+                    } else {
+                				// ignore unexpected events
+                }
+
 			
 	}
 

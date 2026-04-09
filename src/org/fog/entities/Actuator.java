@@ -44,13 +44,14 @@ public class Actuator extends SimEntity{
 
 	@Override
 	public void processEvent(SimEvent ev) {
-		switch(ev.getTag()){
-		case FogEvents.TUPLE_ARRIVAL:
+		org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.TUPLE_ARRIVAL) {
 			processTupleArrival(ev);
-			break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + ev.getTag());
-        }		
+			
+                    } else {
+                				// ignore unexpected events
+                }
+		
 	}
 
 	private void processTupleArrival(SimEvent ev) {

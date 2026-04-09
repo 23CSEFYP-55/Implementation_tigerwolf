@@ -99,7 +99,7 @@ public interface GuestEntity extends CoreAttributes {
                 requestedMips,
                 isInMigration);
         if (!getStateHistory().isEmpty()) {
-            VmStateHistoryEntry previousState = getStateHistory().getLast();
+            VmStateHistoryEntry previousState = getStateHistory().get(getStateHistory().size() - 1);
             if (previousState.getTime() == time) {
                 getStateHistory().set(getStateHistory().size() - 1, newState);
                 return;

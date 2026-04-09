@@ -31,14 +31,23 @@ import java.util.Map;
  */
 public abstract class VmAllocationPolicy {
 
-	public record GuestMapping (
-		GuestEntity vm,
-		HostEntity host,
-		Container container,
-		int datacenterId,
-        boolean NewEventRequired,
-        boolean NewVmRequired)
-	{
+	public static class GuestMapping {
+		private final GuestEntity vm;
+		private final HostEntity host;
+		private final Container container;
+		private final int datacenterId;
+        private final boolean NewEventRequired;
+        private final boolean NewVmRequired;
+
+		public GuestMapping(GuestEntity vm, HostEntity host, Container container, int datacenterId, boolean NewEventRequired, boolean NewVmRequired) {
+			this.vm = vm;
+			this.host = host;
+			this.container = container;
+			this.datacenterId = datacenterId;
+			this.NewEventRequired = NewEventRequired;
+			this.NewVmRequired = NewVmRequired;
+		}
+
 		public GuestMapping(GuestEntity vm, HostEntity host, Container container, boolean newEvReq, boolean newVmReq) {
 			this(vm, host, container, host.getDatacenter().getId(), newEvReq, newVmReq);
 		}
@@ -48,6 +57,13 @@ public abstract class VmAllocationPolicy {
 		public GuestMapping(GuestEntity vm, HostEntity host) {
 			this(vm, host, null);
 		}
+
+		public GuestEntity vm() { return vm; }
+		public HostEntity host() { return host; }
+		public Container container() { return container; }
+		public int datacenterId() { return datacenterId; }
+		public boolean NewEventRequired() { return NewEventRequired; }
+		public boolean NewVmRequired() { return NewVmRequired; }
 	}
 
 	/** The host list. */

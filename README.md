@@ -1,5 +1,46 @@
-# iFogSim2 (The New Version)
-A Toolkit for Modeling and Simulation of Resource Management Techniques in Internet of Things, Edge and Fog Computing Environments with the following new features:
+# iFogSim FANET Simulation with PPO Agent
+
+This repository contains an iFogSim-based simulation of a Flying Ad-Hoc Network (FANET), integrated with a Python-based Proximal Policy Optimization (PPO) agent for intelligent task offloading and resource scheduling.
+
+## Architecture & Workflow
+
+The project consists of two main components acting in tandem:
+1. **Java Simulation (iFogSim)**: Simulates the FANET environment, including UAV fog nodes, task generation, network latency, queueing state, and computational energy consumption.
+2. **Python PPO Server**: A standalone Gym environment and Stable-Baselines3 server that listens for integration requests from the Java simulation. It tracks real-time exact queue states and coordinates of the UAV nodes and responds with the optimal UAV assignment based on a physics-based ranking score AI tie-breaker.
+
+## Requirements & Setup
+
+### Java (Simulation Environment)
+- Java 8 (JRE 1.8)
+- External libraries inside the `jars` folder. If importing into IntelliJ IDEA or Eclipse, ensure the JARs are added to the project's build path/library dependency list.
+
+### Python (PPO Server)
+- Python 3.8 or higher is recommended.
+- Install the required Machine Learning and environment dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Running the Simulation
+
+**Step 1. Start the PPO Server**
+Navigate into the `ppo_agent` directory and start the Python server.
+```bash
+cd ppo_agent
+python fanet_ppo_server.py
+```
+The server will boot up and start listening on port `5000`. It will attempt to load an existing pre-trained model (`fanet_ppo_model.zip`), or train a new model if one is not found.
+
+**Step 2. Start the Java Simulation**
+Run the main FANET simulation class located at:
+`src/org/fog/test/perfeval/FANETSimulation.java`
+Upon starting, the Java simulation connects to `localhost:5000`. The continuous task queuing values stream to the Python server, which calculates and returns the optimal offloading assignment back to the iFogSim broker.
+
+
+---
+
+### Legacy iFogSim2 README
+ A Toolkit for Modeling and Simulation of Resource Management Techniques in Internet of Things, Edge and Fog Computing Environments with the following new features:
  * Mobility-support and Migration Management
    * Supporting real mobility datasets
    * Implementing different random mobility models 
@@ -12,35 +53,6 @@ iFogSim2 currently encompasses several new usecases such as:
  * Audio Translation Scenario
  * Healthcare Scenario
  * Crowd-sensing Scenario
-
-# How to run iFogSim2 ?
-* Eclipse IDE:
-  * Create a Java project
-  * Inside the project directory, initialize an empty Git repository with the following command:
-  ```
-  git init
-  ```
-  * Add the Git repository of iFogSim2 as the `origin` remote:
-  ```
-  git remote add origin https://github.com/Cloudslab/iFogSim
-  ```
-  * Pull the contents of the repository to your machine:
-  ```
-  git pull origin main
-  ```
-  * Include the JARs to your project  
-  * Run the example files (e.g. TranslationServiceFog_Clustering.java, CrowdSensing_Microservices_RandomMobility_Clustering.java) to get started
-
-* IntelliJ IDEA:
-  * Clone the iFogSim2 Git repository to desired folder:
-  ```
-  git clone https://github.com/Cloudslab/iFogSim
-  ```
-  * Select "project from existing resources" from the "File" drop-down menu
-  * Verify the Java version
-  * Verify the external libraries in the "JARs" Folder are added to the project
-  * Run the example files (e.g. TranslationServiceFog_Clustering.java, CrowdSensing_Microservices_RandomMobility_Clustering.java) to get started
-
 
 # References
  * Redowan Mahmud, Samodha Pallewatta, Mohammad Goudarzi, and Rajkumar Buyya, <A href="https://arxiv.org/abs/2109.05636">iFogSim2: An Extended iFogSim Simulator for Mobility, Clustering, and Microservice Management in Edge and Fog Computing Environments</A>, Journal of Systems and Software (JSS), Volume 190, Pages: 1-17, ISSN:0164-1212, Elsevier Press, Amsterdam, The Netherlands, August 2022.

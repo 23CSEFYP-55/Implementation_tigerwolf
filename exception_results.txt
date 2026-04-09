@@ -1,0 +1,6 @@
+src\org\fog\entities\Actuator.java:52: throw new IllegalStateException("Unexpected value: " + ev.getTag());
+src\org\fog\entities\Sensor.java:130: throw new IllegalStateException("Unexpected value: " + ev.getTag());
+src\org\fog\placement\ClusteringController.java:171: throw new IllegalStateException("Unexpected value: " + ev.getTag());
+src\org\fog\placement\Controller.java:115: throw new IllegalStateException("Unexpected value: " + ev.getTag());
+src\org\fog\placement\MicroservicesController.java:225: throw new IllegalStateException("Unexpected value: " + ev.getTag());
+src\org\fog\placement\MobilityController.java:159: throw new IllegalStateException("Unexpected value: " + ev.getTag());

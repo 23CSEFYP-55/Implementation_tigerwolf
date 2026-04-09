@@ -621,7 +621,7 @@ public class Cloudlet {
         }
 
         // use the latest resource submission time
-        final double subTime = resList.getLast().arrivalTime;
+        final double subTime = resList.get(resList.size() - 1).arrivalTime;
         return execStartTime - subTime;
     }
 
@@ -721,7 +721,7 @@ public class Cloudlet {
             return 0;
         }
 
-        return Math.min(resList.getLast().cloudletFinishedSoFar, getCloudletTotalLength()*Consts.MILLION);
+        return Math.min(resList.get(resList.size() - 1).cloudletFinishedSoFar, getCloudletTotalLength()*Consts.MILLION);
     }
 
     /**
@@ -767,7 +767,7 @@ public class Cloudlet {
             return;
         }
 
-        resList.getLast().cloudletFinishedSoFar = length;
+        resList.get(resList.size() - 1).cloudletFinishedSoFar = length;
 
         if (record) {
             write("Sets the length's finished so far to " + length);
@@ -802,7 +802,7 @@ public class Cloudlet {
         if (resList.isEmpty()) {
             return -1;
         }
-        return resList.getLast().resourceId;
+        return resList.get(resList.size() - 1).resourceId;
     }
 
     public double getExecFinishTime() {
@@ -863,8 +863,8 @@ public class Cloudlet {
             write("Allocates this Cloudlet to " + res.resourceName + " (ID #" + resourceID
                     + ") with cost = $" + cost + "/sec");
         } else if (record) {
-            final int id = resList.getLast().resourceId;
-            final String name = resList.getLast().resourceName;
+            final int id = resList.get(resList.size() - 1).resourceId;
+            final String name = resList.get(resList.size() - 1).resourceName;
             write("Moves Cloudlet from " + name + " (ID #" + id + ") to " + res.resourceName + " (ID #"
                     + resourceID + ") with cost = $" + cost + "/sec");
         }
@@ -884,7 +884,7 @@ public class Cloudlet {
             return;
         }
 
-        resList.getLast().arrivalTime = clockTime;
+        resList.get(resList.size() - 1).arrivalTime = clockTime;
 
         if (record) {
             write("Sets the submission time to " + num.format(clockTime));
@@ -903,7 +903,7 @@ public class Cloudlet {
         if (resList.isEmpty()) {
             return 0.0;
         }
-        return resList.getLast().arrivalTime;
+        return resList.get(resList.size() - 1).arrivalTime;
     }
 
     @Deprecated
@@ -949,7 +949,7 @@ public class Cloudlet {
             return;
         }
 
-        final Resource res = resList.getLast();
+        final Resource res = resList.get(resList.size() - 1);
         res.wallClockTime = wallTime;
         res.actualCPUTime = actualTime;
 
@@ -1082,7 +1082,7 @@ public class Cloudlet {
         if (resList.isEmpty()) {
             return 0.0;
         }
-        return resList.getLast().costPerSec;
+        return resList.get(resList.size() - 1).costPerSec;
     }
 
     /**
@@ -1097,7 +1097,7 @@ public class Cloudlet {
         if (resList.isEmpty()) {
             return 0.0;
         }
-        return resList.getLast().wallClockTime;
+        return resList.get(resList.size() - 1).wallClockTime;
     }
 
     /**

@@ -59,11 +59,12 @@ public class SDNDatacenter extends Datacenter {
 	
 	@Override
 	public void processOtherEvent(SimEvent ev){
-		switch(ev.getTag()){
-			case Constants.REQUEST_SUBMIT: processRequest((Request) ev.getData()); break;
-			case Constants.APPLICATION_SUBMIT: processApplication(ev.getSource(),(String) ev.getData()); break;
-			default: System.out.println("Unknown event recevied by SdnDatacenter. Tag:"+ev.getTag());
-		}
+		org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == Constants.REQUEST_SUBMIT) { processRequest((Request) ev.getData()); 
+			        } else if (_tag_ == Constants.APPLICATION_SUBMIT) { processApplication(ev.getSource(),(String) ev.getData()); 
+			        } else { System.out.println("Unknown event recevied by SdnDatacenter. Tag:"+ev.getTag());
+		        }
+
 	}
 
 	@Override

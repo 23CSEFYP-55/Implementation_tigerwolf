@@ -652,11 +652,12 @@ public class CloudSim {
 
 		// Ok now process it
 		switch (e.getType()) {
-			case SimEvent.ENULL -> throw new IllegalArgumentException("Event has a null type.");
-			case SimEvent.CREATE -> {
+			case SimEvent.ENULL:
+				throw new IllegalArgumentException("Event has a null type.");
+			case SimEvent.CREATE:
 				addEntityDynamically((SimEntity) e.getData());
-			}
-			case SimEvent.SEND -> {
+				break;
+			case SimEvent.SEND:
                 if (destEnt.getState() == SimEntity.EntityStatus.WAITING) { // NOTE: this branch is never used
                     Predicate p = waitPredicates.get(dstId);
 
@@ -666,10 +667,12 @@ public class CloudSim {
                     }
                 }
 				destEnt.getIncomingEvents().add(e);
-            }
-			case SimEvent.HOLD_DONE -> entities.get(srcId).setState(SimEntity.EntityStatus.RUNNABLE);
-			default -> {
-			}
+                break;
+			case SimEvent.HOLD_DONE:
+				entities.get(srcId).setState(SimEntity.EntityStatus.RUNNABLE);
+				break;
+			default:
+				break;
 		}
 	}
 

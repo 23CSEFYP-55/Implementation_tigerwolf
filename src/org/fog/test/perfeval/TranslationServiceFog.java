@@ -48,7 +48,7 @@ public class TranslationServiceFog {
     static int numberOfMobileUser = 1;
 
 
-    public static void main(String[] args) {
+     public static void main(String[] args) {
 
         Log.printLine("Starting Translation Service...");
 

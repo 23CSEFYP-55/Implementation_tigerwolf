@@ -208,7 +208,7 @@ public abstract class VmScheduler {
 			Log.println("Pe list is empty");
 			return 0;
 		}
-		return getPeList().getFirst().getMips();
+		return getPeList().get(0).getMips();
 	}
 
 	public List<? extends Pe> getPeList() { return peList; }

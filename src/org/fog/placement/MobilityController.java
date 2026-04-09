@@ -129,23 +129,23 @@ public class MobilityController extends SimEntity{
 
 	@Override
 	public void processEvent(SimEvent ev) {
-		switch(ev.getTag()){
-		case FogEvents.APP_SUBMIT:
+		org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.APP_SUBMIT) {
 			processAppSubmit(ev);
-			break;
-		case FogEvents.MOBILITY_SUBMIT:
+			
+		        } else if (_tag_ == FogEvents.MOBILITY_SUBMIT) {
 			processMobilityData();
-			break;
-		case FogEvents.MOBILITY_MANAGEMENT:
+			
+		        } else if (_tag_ == FogEvents.MOBILITY_MANAGEMENT) {
 			processMobility(ev);
-			break;
-		case FogEvents.TUPLE_FINISHED:
+			
+		        } else if (_tag_ == FogEvents.TUPLE_FINISHED) {
 			processTupleFinished(ev);
-			break;
-		case FogEvents.CONTROLLER_RESOURCE_MANAGE:
+			
+		        } else if (_tag_ == FogEvents.CONTROLLER_RESOURCE_MANAGE) {
 			manageResources();
-			break;
-		case FogEvents.STOP_SIMULATION:
+			
+		        } else if (_tag_ == FogEvents.STOP_SIMULATION) {
 			CloudSim.stopSimulation();
 			printTimeDetails();
 			printPowerDetails();
@@ -153,11 +153,12 @@ public class MobilityController extends SimEntity{
 			printNetworkUsageDetails();
 			printMigrationDelayDetails();
 			System.exit(0);
-			break;
+			
 
-            default:
-                throw new IllegalStateException("Unexpected value: " + ev.getTag());
-        }
+                    } else {
+                				// ignore unexpected events
+                }
+
 	}
 	
 	private void printMigrationDelayDetails() {

@@ -87,14 +87,14 @@ public class MicroservicesMobilityClusteringController extends MicroservicesCont
 
     @Override
     public void processEvent(SimEvent ev) {
-        switch (ev.getTag()) {
-            case FogEvents.MOBILITY_SUBMIT:
+        org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
+        if (_tag_ == FogEvents.MOBILITY_SUBMIT) {
                 processMobilityData();
-                break;
-            case FogEvents.MOBILITY_MANAGEMENT:
+                
+                    } else if (_tag_ == FogEvents.MOBILITY_MANAGEMENT) {
                 processMobility(ev);
-                break;
-            case FogEvents.STOP_SIMULATION:
+                
+                    } else if (_tag_ == FogEvents.STOP_SIMULATION) {
                 CloudSim.stopSimulation();
                 printTimeDetails();
                 printPowerDetails();
@@ -102,11 +102,12 @@ public class MicroservicesMobilityClusteringController extends MicroservicesCont
                 printNetworkUsageDetails();
                 printMigrationDelayDetails();
                 System.exit(0);
-                break;
-            default:
+                
+                    } else {
                 super.processEvent(ev);
-                break;
-        }
+                
+                }
+
     }
 
     private void printMigrationDelayDetails() {
