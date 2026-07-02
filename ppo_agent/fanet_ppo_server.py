@@ -170,7 +170,7 @@ def rank_uavs(model, obs, uav_list, task_data_size, task_cpu_cycles, task_priori
 # ─────────────────────────────────────────────
 def run_server():
     model, env = get_model()
-    HOST, PORT = "localhost", 5000
+    HOST, PORT = "localhost", 5500
     
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -180,64 +180,73 @@ def run_server():
     print(f"\n[PPO Server] Listening on {HOST}:{PORT}")
     print("[PPO Server] Waiting for Java iFogSim to connect...\n")
 
-    conn, addr = server.accept()
-    print(f"[PPO Server] SUCCESS: Connected to Java at {addr}\n")
-
-    buffer = ""
-    count  = 0
-    
     while True:
         try:
-            chunk = conn.recv(4096).decode("utf-8")
-            if not chunk:
-                break
-            buffer += chunk
-            
-            # Process complete JSON payloads
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                if line == "CLOSE":
-                    print("\n[PPO Server] Java simulation ended. Closing.")
-                    conn.close()
-                    server.close()
-                    return
-
-                # Parse JSON sent by Java
-                data     = json.loads(line)
-                uav_list = data["uavs"]
-
-                task_data = float(data.get("task_data_size",  1000))
-                task_cpu  = float(data.get("task_cpu_cycles", 2000))
-                task_id   = data.get("task_id", count)
-                
-                # Cycle priority if not provided by Java
-                task_priority = float((int(task_id) % 3) + 1)
-                data["task_priority"] = task_priority  
-
-                # Generate Obs and Rank
-                obs    = json_to_obs(data)
-                ranked = rank_uavs(model, obs, uav_list, task_data, task_cpu, task_priority)
-
-                # Send ranked list back to Java
-                response = json.dumps({"ranked_uavs": ranked}) + "\n"
-                conn.sendall(response.encode("utf-8"))
-                
-                count += 1
-
-                # Clean Terminal Printout
-                queues = [u.get("queue_size", 0) for u in uav_list]
-                print(f"[Task {task_id:>4}] Prio: {int(task_priority)} | Queues: {queues} | Assigned: {ranked[0]}")
-
-        except Exception as e:
-            print(f"[PPO Server] Error: {e}")
+            conn, addr = server.accept()
+            print(f"[PPO Server] SUCCESS: Connected to client at {addr}\n")
+        except KeyboardInterrupt:
             break
 
-    print(f"\n[PPO] Done. Ranked {count} tasks.")
-    conn.close()
+        buffer = ""
+        count  = 0
+        should_exit = False
+        
+        while True:
+            try:
+                chunk = conn.recv(4096).decode("utf-8")
+                if not chunk:
+                    break
+                buffer += chunk
+                
+                # Process complete JSON payloads
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    if line == "CLOSE":
+                        print("\n[PPO Server] Java simulation ended. Closing.")
+                        should_exit = True
+                        break
+    
+                    # Parse JSON sent by Java
+                    data     = json.loads(line)
+                    uav_list = data["uavs"]
+    
+                    task_data = float(data.get("task_data_size",  1000))
+                    task_cpu  = float(data.get("task_cpu_cycles", 2000))
+                    task_id   = data.get("task_id", count)
+                    
+                    # Cycle priority if not provided by Java
+                    task_priority = float((int(task_id) % 3) + 1)
+                    data["task_priority"] = task_priority  
+    
+                    # Generate Obs and Rank
+                    obs    = json_to_obs(data)
+                    ranked = rank_uavs(model, obs, uav_list, task_data, task_cpu, task_priority)
+    
+                    # Send ranked list back to Java
+                    response = json.dumps({"ranked_uavs": ranked}) + "\n"
+                    conn.sendall(response.encode("utf-8"))
+                    
+                    count += 1
+    
+                    # Clean Terminal Printout
+                    queues = [u.get("queue_size", 0) for u in uav_list]
+                    print(f"[Task {task_id:>4}] Prio: {int(task_priority)} | Queues: {queues} | Assigned: {ranked[0]}")
+    
+            except Exception as e:
+                print(f"[PPO Server] Error: {e}")
+                break
+            if should_exit:
+                break
+        
+        conn.close()
+        print(f"[PPO] Session finished. Ranked {count} tasks.")
+        if should_exit:
+            break
+            
     server.close()
 
 if __name__ == "__main__":

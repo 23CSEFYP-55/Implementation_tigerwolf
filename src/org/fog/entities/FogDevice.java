@@ -33,6 +33,11 @@ public class FogDevice extends PowerDatacenter {
     public java.util.List<Tuple> acceptedTasks = new java.util.ArrayList<>();
     // -------------------------------------
 
+    // --- Metric 5: Computation Load Variance ---
+    // Collects a CPU utilization sample (0.0-1.0) on every energy update tick.
+    public java.util.List<Double> utilizationSamples = new java.util.ArrayList<>();
+    // -------------------------------------------
+
     protected List<String> activeApplications;
 
     protected Map<String, Application> applicationMap;
@@ -622,16 +627,6 @@ public class FogDevice extends PowerDatacenter {
                 + (timeNow - lastUtilizationUpdateTime) * getHost().getPowerModel().getPower(lastUtilization);
         setEnergyConsumption(newEnergyConsumption);
 
-        /*
-         * if(getName().equals("d-0")){
-         * System.out.println("------------------------");
-         * System.out.println("Utilization = "+lastUtilization);
-         * System.out.println("Power = "+getHost().getPowerModel().getPower(
-         * lastUtilization));
-         * System.out.println(timeNow-lastUtilizationUpdateTime);
-         * }
-         */
-
         double currentCost = getTotalCost();
         double newcost = currentCost
                 + (timeNow - lastUtilizationUpdateTime) * getRatePerMips() * lastUtilization * getHost().getTotalMips();
@@ -639,6 +634,10 @@ public class FogDevice extends PowerDatacenter {
 
         lastUtilization = Math.min(1, totalMipsAllocated / getHost().getTotalMips());
         lastUtilizationUpdateTime = timeNow;
+
+        // --- Metric 5: Record utilization sample for load-variance computation ---
+        utilizationSamples.add(lastUtilization);
+        // ------------------------------------------------------------------------
     }
 
     protected void processAppSubmit(SimEvent ev) {

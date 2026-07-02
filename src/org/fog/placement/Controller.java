@@ -103,6 +103,7 @@ public class Controller extends SimEntity {
 			printPowerDetails();
 			printCostDetails();
 			printNetworkUsageDetails();
+			printComputationLoadVariance();
 			System.exit(0);
 
 		} else if (_tag_ == FogEvents.TUPLE_ARRIVAL) {
@@ -172,6 +173,79 @@ public class Controller extends SimEntity {
 			System.out.println(
 					tupleType + " ---> " + TimeKeeper.getInstance().getTupleTypeToAverageCpuTime().get(tupleType));
 		}
+		System.out.println("=========================================");
+	}
+
+	/**
+	 * Metric 5 – Computation Load Variance
+	 *
+	 * Computes the continuous-time variance of CPU utilization across all UAV and
+	 * terrestrial edge server nodes (i.e., every FogDevice that is not the cloud).
+	 *
+	 * Variance = E[U^2] - (E[U])^2 (population variance over all samples)
+	 *
+	 * Each sample represents the CPU utilization fraction [0,1] at one
+	 * RESOURCE_MGMT_INTERVAL tick. All samples from all edge devices are pooled
+	 * together so the result reflects the global load-balancing spread.
+	 */
+	private void printComputationLoadVariance() {
+		System.out.println("=========================================");
+		System.out.println("COMPUTATION LOAD VARIANCE (Metric 5)");
+		System.out.println("=========================================");
+
+		// Collect utilization samples from all edge devices (UAVs + terrestrial edge).
+		// The cloud node is excluded because we only want to measure the edge layer.
+		List<Double> allSamples = new java.util.ArrayList<>();
+		for (FogDevice dev : getFogDevices()) {
+			if (dev.getName().toLowerCase().equals("cloud"))
+				continue;
+			allSamples.addAll(dev.utilizationSamples);
+		}
+
+		if (allSamples.isEmpty()) {
+			System.out.println("No utilization samples collected – variance cannot be computed.");
+			System.out.println("=========================================");
+			return;
+		}
+
+		// --- Two-pass variance: E[U] then E[(U - mean)^2] ---
+		double sum = 0.0;
+		for (double u : allSamples)
+			sum += u;
+		double mean = sum / allSamples.size();
+
+		double sq = 0.0;
+		for (double u : allSamples)
+			sq += (u - mean) * (u - mean);
+		double variance = sq / allSamples.size();
+		double stddev = Math.sqrt(variance);
+
+		// Per-device breakdown (mean & variance per device)
+		for (FogDevice dev : getFogDevices()) {
+			if (dev.getName().toLowerCase().equals("cloud"))
+				continue;
+			List<Double> s = dev.utilizationSamples;
+			if (s.isEmpty()) {
+				System.out.printf("  %-22s | samples: 0%n", dev.getName());
+				continue;
+			}
+			double dSum = 0.0;
+			for (double u : s)
+				dSum += u;
+			double dMean = dSum / s.size();
+			double dSq = 0.0;
+			for (double u : s)
+				dSq += (u - dMean) * (u - dMean);
+			double dVar = dSq / s.size();
+			System.out.printf("  %-22s | samples: %4d | mean util: %.4f | variance: %.6f%n",
+					dev.getName(), s.size(), dMean, dVar);
+		}
+
+		System.out.println("-----------------------------------------");
+		System.out.printf("  Total samples       : %d%n", allSamples.size());
+		System.out.printf("  Global mean util    : %.4f  (%.2f%%)%n", mean, mean * 100);
+		System.out.printf("  Global variance     : %.6f%n", variance);
+		System.out.printf("  Global std-dev      : %.6f%n", stddev);
 		System.out.println("=========================================");
 	}
 

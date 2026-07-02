@@ -22,9 +22,9 @@ public class PreferenceBuilder {
 
     public static void connectToPPO() {
         try {
-            // MATCHED TO PYTHON PORT 5000
-            System.out.println("Attempting to connect to Python TF-PPO Server on port 5000...");
-            socket = new Socket("127.0.0.1", 5000);
+            // MATCHED TO PYTHON PORT 5500
+            System.out.println("Attempting to connect to Python TF-PPO Server on port 5500...");
+            socket = new Socket("127.0.0.1", 5500);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             System.out.println("SUCCESS: Connected to Python Server!");
