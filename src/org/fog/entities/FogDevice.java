@@ -696,7 +696,6 @@ public class FogDevice extends PowerDatacenter {
 
         // --- MOGS INTERCEPTOR ---
         if (getName().startsWith("uav") && tuple.getDirection() == Tuple.UP && tuple.assignedUavId == null) {
-            System.out.println("DEBUG: UAV " + getName() + " intercepted tuple " + tuple.getCloudletId());
             org.fog.placement.Controller.taskWaitingPool.add(tuple);
             if (org.fog.placement.Controller.taskWaitingPool.size() >= 20) {
                 System.out.println("--- Batch of 5 tasks reached! Running MOGS Matching ---");

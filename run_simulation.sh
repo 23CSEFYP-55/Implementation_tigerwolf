@@ -20,7 +20,7 @@ trap cleanup EXIT
 echo "========================================="
 echo "Compiling Java simulation files..."
 echo "========================================="
-javac -d "$PROJECT_DIR/out/production/iFogSim" -cp "$PROJECT_DIR/jars/*:$PROJECT_DIR/jars/commons-math3-3.5/*" $(find "$PROJECT_DIR/src" -name "*.java")
+javac --release 25 -d "$PROJECT_DIR/out/production/iFogSim" -cp "$PROJECT_DIR/jars/*:$PROJECT_DIR/jars/commons-math3-3.5/*" $(find "$PROJECT_DIR/src" -name "*.java")
 echo "Compilation complete!"
 
 # 2. Check/Start Python Server
