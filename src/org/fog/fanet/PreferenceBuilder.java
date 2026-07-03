@@ -61,6 +61,9 @@ public class PreferenceBuilder {
 
             // Process each task in the batch
             for (Tuple task : tasks) {
+                // Add Randomness to the task to simulate real dynamic loads
+                task.tupleDataSize = 1000.0 * (0.2 + (Math.random() * 1.5));
+                task.tupleCpuCycles = 2000.0 * (0.2 + (Math.random() * 1.5));
                 
                 // 1. Build UAV JSON dynamically INSIDE the loop so it has fresh queue numbers
                 StringBuilder uavJsonBuilder = new StringBuilder();
@@ -80,7 +83,7 @@ public class PreferenceBuilder {
                 // 2. Construct the JSON object
                 String jsonRequest = String.format(
                     "{\"task_id\": %d, \"task_data_size\": %f, \"task_cpu_cycles\": %f, \"uavs\": %s}",
-                    task.getCloudletId(), (double) task.getCloudletFileSize(), (double) task.getCloudletLength(), uavJsonBuilder.toString()
+                    task.getCloudletId(), task.tupleDataSize, task.tupleCpuCycles, uavJsonBuilder.toString()
                 );
 
                 // 3. Send to Python

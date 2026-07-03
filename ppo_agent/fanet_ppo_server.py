@@ -190,6 +190,11 @@ def run_server():
         buffer = ""
         count  = 0
         should_exit = False
+        uav_utilization = {}
+        
+        print("\n+" + "-"*85 + "+")
+        print(f"| {'Task ID':<7} | {'Priority':<8} | {'Data Size':<10} | {'CPU Cycles':<11} | {'UAV Queues':<16} | {'Assigned UAV':<12} |")
+        print("+" + "-"*85 + "+")
         
         while True:
             try:
@@ -206,7 +211,14 @@ def run_server():
                         continue
                         
                     if line == "CLOSE":
+                        print("+" + "-"*85 + "+")
                         print("\n[PPO Server] Java simulation ended. Closing.")
+                        print("\n" + "="*40)
+                        print("       FINAL UAV UTILIZATION")
+                        print("="*40)
+                        for uav, t_count in sorted(uav_utilization.items()):
+                            print(f"  {uav:<12} : {t_count:>5} tasks processed")
+                        print("="*40 + "\n")
                         should_exit = True
                         break
     
@@ -232,9 +244,15 @@ def run_server():
                     
                     count += 1
     
+                    # Keep track of utilization
+                    if ranked[0] not in uav_utilization:
+                        uav_utilization[ranked[0]] = 0
+                    uav_utilization[ranked[0]] += 1
+    
                     # Clean Terminal Printout
                     queues = [u.get("queue_size", 0) for u in uav_list]
-                    print(f"[Task {task_id:>4}] Prio: {int(task_priority)} | Queues: {queues} | Assigned: {ranked[0]}")
+                    q_str = str(queues)
+                    print(f"| {task_id:<7} | {int(task_priority):<8} | {task_data:<10.1f} | {task_cpu:<11.1f} | {q_str:<16} | {ranked[0]:<12} |")
     
             except Exception as e:
                 print(f"[PPO Server] Error: {e}")

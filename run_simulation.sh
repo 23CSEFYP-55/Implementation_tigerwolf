@@ -32,6 +32,14 @@ else
     exit 1
 fi
 
+# Install dependencies
+
+echo "========================================="
+echo "Installing dependencies..."
+echo "========================================="
+$PYTHON_CMD -m pip install -r "$PROJECT_DIR/requirements.txt"
+echo "Dependencies installed successfully!"
+
 echo "========================================="
 echo "Starting Python PPO Server..."
 echo "========================================="

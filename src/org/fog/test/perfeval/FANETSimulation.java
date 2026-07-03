@@ -35,6 +35,7 @@ import org.fog.utils.FogLinearPowerModel;
 import org.fog.utils.FogUtils;
 import org.fog.utils.TimeKeeper;
 import org.fog.utils.distribution.DeterministicDistribution;
+import org.fog.utils.distribution.UniformDistribution;
 
 public class FANETSimulation {
 
@@ -149,7 +150,7 @@ public class FANETSimulation {
 
         // --- SENSOR (generates the actual tasks/tuples) ---
         Sensor sensor = new Sensor("sensor_0", "SENSOR_DATA", userId, appId,
-                new DeterministicDistribution(SENSOR_TRANSMISSION_TIME));
+                new UniformDistribution(SENSOR_TRANSMISSION_TIME - 3.0, SENSOR_TRANSMISSION_TIME + 3.0));
         sensor.setGatewayDeviceId(groundDevice.getId());
         sensor.setLatency(1.0); // 1ms sensor-to-device latency
         sensors.add(sensor);
