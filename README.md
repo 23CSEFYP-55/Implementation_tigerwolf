@@ -1,12 +1,15 @@
 # iFogSim FANET Simulation with PPO Agent
 
-This repository contains an iFogSim-based simulation of a Flying Ad-Hoc Network (FANET), integrated with a Python-based Proximal Policy Optimization (PPO) agent for intelligent task offloading and resource scheduling.
+This repository contains an iFogSim-based simulation of a Flying Ad-Hoc Network (FANET), integrated with a Python-based PyTorch Proximal Policy Optimization (PPO) agent. This project represents a terrestrial Mobile Edge Computing (MEC) simulation designed to benchmark the system proposed in "A Multi-UAV Cooperative Task Scheduling in Dynamic Environments: Throughput Maximization" (Zhao et al., 2025).
+
+![Simulation Result](images/result.png)
 
 ## Architecture & Workflow
 
-The project consists of two main components acting in tandem:
-1. **Java Simulation (iFogSim)**: Simulates the FANET environment, including UAV fog nodes, task generation, network latency, queueing state, and computational energy consumption.
-2. **Python PPO Server**: A standalone Gym environment and Stable-Baselines3 server that listens for integration requests from the Java simulation. It tracks real-time exact queue states and coordinates of the UAV nodes and responds with the optimal UAV assignment based on a physics-based ranking score AI tie-breaker.
+The simulation utilizes a strict role separation architecture between the Java environment and the Python AI server:
+
+1. **Java Simulation (iFogSim & MOGS Scheduling)**: Exclusively handles task generation, data transmission, and the **Many-to-One Gale-Shapley (MOGS)** task scheduling algorithm. It simulates the strict terrestrial MEC model with no centralized Cloud infrastructure.
+2. **Python PPO Server**: Exclusively handles UAV flight trajectory and formation control using a PyTorch-based PPO agent following a Centralized Training with Decentralized Execution (CTDE) framework. It periodically receives global state via TCP and computes optimal trajectories, but **does not** dictate task assignments.
 
 ## Requirements & Setup
 
@@ -29,12 +32,12 @@ Navigate into the `ppo_agent` directory and start the Python server.
 cd ppo_agent
 python fanet_ppo_server.py
 ```
-The server will boot up and start listening on port `5000`. It will attempt to load an existing pre-trained model (`fanet_ppo_model.zip`), or train a new model if one is not found.
+The server will boot up and start listening on port `5500` (TCP socket).
 
 **Step 2. Start the Java Simulation**
 Run the main FANET simulation class located at:
 `src/org/fog/test/perfeval/FANETSimulation.java`
-Upon starting, the Java simulation connects to `localhost:5000`. The continuous task queuing values stream to the Python server, which calculates and returns the optimal offloading assignment back to the iFogSim broker.
+Upon starting, the Java simulation connects to `localhost:5500`. The Java side periodically sends the global state (UAV positions, queues, energy) to Python, which computes next geographic targets and sends them back. When task batches reach a threshold, Java executes the MOGS matching algorithm to route tasks.
 
 
 ---
