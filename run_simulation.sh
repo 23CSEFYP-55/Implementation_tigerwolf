@@ -41,6 +41,13 @@ $PYTHON_CMD -m pip install -r "$PROJECT_DIR/requirements.txt"
 echo "Dependencies installed successfully!"
 
 echo "========================================="
+echo "Running Python Tests..."
+echo "========================================="
+cd "$PROJECT_DIR/ppo_agent"
+$PYTHON_CMD -m pytest test_ppo_server.py
+echo "Tests passed!"
+
+echo "========================================="
 echo "Starting Python PPO Server..."
 echo "========================================="
 cd "$PROJECT_DIR/ppo_agent"

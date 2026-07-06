@@ -99,18 +99,18 @@ public class Controller extends SimEntity {
 
 		} else if (_tag_ == FogEvents.STOP_SIMULATION) {
 			CloudSim.stopSimulation();
-			printTimeDetails();
-			printPowerDetails();
-			printCostDetails();
-			printNetworkUsageDetails();
-			printComputationLoadVariance();
-			System.exit(0);
+			// printTimeDetails();
+			// printPowerDetails();
+			// printCostDetails();
+			// printNetworkUsageDetails();
+			// printComputationLoadVariance();
+			// System.exit(0); // Removing this so control returns to FANETSimulation.java
 
 		} else if (_tag_ == FogEvents.TUPLE_ARRIVAL) {
 			Tuple tuple = (Tuple) ev.getData();
 			taskWaitingPool.add(tuple);
-			if (taskWaitingPool.size() >= 20) {
-				System.out.println("--- Batch of 20 tasks reached! Running MOGS Matching ---");
+			if (taskWaitingPool.size() >= 100) {
+				System.out.println("--- Batch of 100 tasks reached! Running MOGS Matching ---");
 				runFanetMOGSScheduling();
 			}
 
@@ -313,35 +313,33 @@ public class Controller extends SimEntity {
 		if (taskWaitingPool.isEmpty())
 			return;
 
-		// 1. Identify all FogDevices acting as UAVs
+		// 1. Identify all FogDevices acting as UAVs and MDs
 		java.util.List<FogDevice> uavs = new java.util.ArrayList<>();
+		java.util.List<FogDevice> mds = new java.util.ArrayList<>();
 		for (FogDevice device : getFogDevices()) {
 			if (device.getName().startsWith("uav")) {
 				uavs.add(device);
+			} else if (device.getName().startsWith("ground_device")) {
+				mds.add(device);
 			}
 		}
 
-		// 2. Build Preferences via PPO + utility math
-		org.fog.fanet.PreferenceBuilder.buildPreferences(taskWaitingPool, uavs);
+		// 2. Trajectory Optimization via TF-PPO Python Server
+		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
 
-		// 3. Run MOGS Matching
+		// 3. Local Java MOGS Task Scheduling
 		org.fog.fanet.MOGSMatching.runMatching(taskWaitingPool, uavs);
 
-		// 4. Update persistent queue tracker with real assigned task counts
-		for (FogDevice uav : uavs) {
-			this.uavQueueTracker.put(uav.getName(), uav.acceptedTasks.size());
-		}
-
-		// 5. Physically route the Tuples
+		// 4. Physically route the Tuples
 		for (Tuple task : taskWaitingPool) {
 			if (task.assignedUavId != null) {
 				sendNow(task.assignedUavId, FogEvents.TUPLE_ARRIVAL, task);
 			} else {
-				sendNow(getCloudId(), FogEvents.TUPLE_ARRIVAL, task);
+				System.out.println("Task " + task.getCloudletId() + " dropped (No UAVs in range or swamped)");
 			}
 		}
 
-		// 6. Clear the pool for the next batch
+		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();
 	}
 

@@ -35,8 +35,8 @@ import org.fog.utils.FogLinearPowerModel;
 import org.fog.utils.FogUtils;
 import org.fog.utils.TimeKeeper;
 import org.fog.utils.distribution.DeterministicDistribution;
+import org.fog.utils.distribution.PoissonDistribution;
 import org.fog.utils.distribution.UniformDistribution;
-
 public class FANETSimulation {
 
     // All fog devices and sensors/actuators in the simulation
@@ -46,10 +46,11 @@ public class FANETSimulation {
 
     // Application, UAV count, and HARD LIMITS
     static int numUAVs = 3;
-    static double SENSOR_TRANSMISSION_TIME = 10.0; // ms between task emissions
+    static int NUM_MDS = 800; // 800 MDs
+    static double SENSOR_TRANSMISSION_TIME = 1000.0; // Mean time (lambda) for Poisson
 
-    // --- NEW: Task Limit ---
-    static int MAX_TASKS = 500;
+    // --- NEW: Time Limit ---
+    static double MAX_SIM_TIME = 5000.0;
 
     public static void main(String[] args) {
         Log.printLine("========== Starting FANET Simulation with MOGS Matching ==========");
@@ -67,7 +68,13 @@ public class FANETSimulation {
             Application application = createApplication(appId, broker.getId());
             application.setUserId(broker.getId());
 
-            // 3. Create the physical topology (Cloud + UAVs + Ground Devices)
+            // Dynamic UAV count between 2 and 12
+            numUAVs = 2 + new java.util.Random().nextInt(11);
+            System.out.println("Dynamically spawning " + numUAVs + " UAVs...");
+
+            Log.disable(); // Directive 1: Silence Default Logging (Noise Reduction)
+
+            // 3. Create the physical topology (UAVs + Ground Devices)
             createFogDevices(broker.getId(), appId);
 
             // 4. Create the Controller (which now has our MOGS logic)
@@ -75,10 +82,11 @@ public class FANETSimulation {
 
             // 5. Set the module placement policy (EdgeWards = prefer edge/UAV nodes)
             ModuleMapping moduleMapping = ModuleMapping.createModuleMapping();
-            moduleMapping.addModuleToDevice("storage_module", "cloud");
+            for (int i = 0; i < NUM_MDS; i++) {
+                moduleMapping.addModuleToDevice("sensor_module", "ground_device_" + i);
+            }
             controller.submitApplication(application,
                     new ModulePlacementMOGS(fogDevices, sensors, actuators, application, moduleMapping));
-
 
             // 6. Record simulation start time and run
             TimeKeeper.getInstance().setSimulationStartTime(Calendar.getInstance().getTimeInMillis());
@@ -86,27 +94,61 @@ public class FANETSimulation {
             // Connect to the Python AI Server
             org.fog.fanet.PreferenceBuilder.connectToPPO();
 
-            // --- NEW: Calculate exact stop time to enforce MAX_TASKS ---
-            // If tasks emit every 10ms, stopping at 5000ms ensures exactly 500 tasks.
-            double stopTime = MAX_TASKS * SENSOR_TRANSMISSION_TIME;
-            Log.printLine("Scheduling simulation termination at " + stopTime + " ms to enforce task limit.");
-            CloudSim.terminateSimulation(stopTime);
+            // Enforce simulation time
+            System.out.println("Scheduling simulation termination at " + MAX_SIM_TIME + " ms.");
+            CloudSim.terminateSimulation(MAX_SIM_TIME);
 
             // Start the simulation loop
             CloudSim.startSimulation();
             CloudSim.stopSimulation();
 
             // --- CRITICAL STEP FOR SHUTDOWN ---
-            // Ensure that inside your disconnectFromPPO() method, you are sending
-            // the `out.println("CLOSE");` command to the Python socket before closing it!
             org.fog.fanet.PreferenceBuilder.disconnectFromPPO();
 
-            Log.printLine("========== FANET Simulation Finished ==========");
+            Log.enable(); // Re-enable logging for the final dashboard
+
+            // Directive 3: Generate the Final Benchmark Dashboard
+            printUAVBenchmarks();
+
+            System.out.println("========== FANET Simulation Finished ==========");
 
         } catch (Exception e) {
             e.printStackTrace();
-            Log.printLine("An error occurred during the FANET simulation.");
+            System.out.println("An error occurred during the FANET simulation.");
         }
+    }
+
+    private static void printUAVBenchmarks() {
+        System.out.println("\n========== FINAL UAV BENCHMARK DASHBOARD ==========");
+        System.out.println(String.format("%-15s | %-15s | %-20s | %-16s | %-19s | %-15s", 
+                "UAV ID", "Tasks Completed", "Data Processed (MB)", "Avg Latency (ms)", "Energy Consumed (J)", "Tasks Offloaded"));
+        System.out.println("----------------------------------------------------------------------------------------------------------------------");
+
+        long totalSystemTasks = 0;
+        double totalSystemData = 0.0;
+        double totalSystemLatency = 0.0;
+
+        for (FogDevice device : fogDevices) {
+            if (device.getName().startsWith("uav")) {
+                int completed = device.completedTasks;
+                double dataMB = device.totalDataProcessed / (1024.0 * 1024.0);
+                double avgLatency = (completed > 0) ? (device.totalLatency / completed) : 0.0;
+                double energy = device.getEnergyConsumption();
+                int offloaded = device.tasksOffloaded;
+
+                totalSystemTasks += completed;
+                totalSystemData += dataMB;
+                totalSystemLatency += device.totalLatency;
+
+                System.out.println(String.format("%-15s | %-15d | %-20.4f | %-16.2f | %-19.4f | %-15d", 
+                        device.getName(), completed, dataMB, avgLatency, energy, offloaded));
+            }
+        }
+
+        System.out.println("----------------------------------------------------------------------------------------------------------------------");
+        double systemAvgLatency = (totalSystemTasks > 0) ? (totalSystemLatency / totalSystemTasks) : 0.0;
+        System.out.println(String.format("System Total Throughput: %.4f MB  |  Average System Latency: %.2f ms", totalSystemData, systemAvgLatency));
+        System.out.println("===================================================\n");
     }
 
     /**
@@ -116,12 +158,7 @@ public class FANETSimulation {
      * - 1 Ground sensor device (mobile end device)
      */
     private static void createFogDevices(int userId, String appId) {
-
-        // --- CLOUD NODE ---
-        FogDevice cloud = createFogDevice("cloud", 44800, 40000, 100, 10000, 0,
-                0.01, 16 * 103, 16 * 83.25);
-        cloud.setParentId(-1); // Cloud has no parent
-        fogDevices.add(cloud);
+        java.util.Random rand = new java.util.Random();
 
         // --- UAV NODES (Edge Layer) ---
         // These are named "uav_X" so the MOGS scheduler identifies them
@@ -129,37 +166,41 @@ public class FANETSimulation {
             long mips = 2800 + (i * 800); // Give each drone a different MIPS capacity
             FogDevice uav = createFogDevice("uav_" + i, mips, 4000, 10000, 1000, 1,
                     0.0, 107.339, 83.4333);
-            uav.setParentId(cloud.getId());
-            uav.setUplinkLatency(5); // 5ms latency to cloud
+            uav.setParentId(-1); // No cloud, so no parent
+            uav.setUplinkLatency(5);
 
             // Set FANET-specific properties (coordinates and task capacity)
-            uav.x_coord = (i + 1) * 100.0; // Spread UAVs spatially
-            uav.y_coord = (i + 1) * 50.0;
-            uav.taskCapacity = 10;          // Each UAV handles up to 10 tasks
+            uav.x_coord = rand.nextDouble() * 2000.0;
+            uav.y_coord = rand.nextDouble() * 2000.0;
+            uav.taskCapacity = 10;
+            uav.coverageRadius = 30.0 + (rand.nextDouble() * 100.0); // 30m to 130m
 
             fogDevices.add(uav);
         }
 
-        // --- GROUND SENSOR DEVICE ---
-        FogDevice groundDevice = createFogDevice("ground_device_0", 1000, 1000, 10000, 270,
-                3, 0.0, 87.53, 82.44);
-        // Connect ground device to uav_0 as its parent
-        groundDevice.setParentId(fogDevices.get(1).getId()); // uav_0
-        groundDevice.setUplinkLatency(2);
-        fogDevices.add(groundDevice);
+        // --- 800 GROUND SENSOR DEVICES (MDs) ---
+        for (int i = 0; i < NUM_MDS; i++) {
+            FogDevice groundDevice = createFogDevice("ground_device_" + i, 1000, 1000, 10000, 270,
+                    3, 0.0, 87.53, 82.44);
+            // Standalone devices, MOGS handles routing
+            groundDevice.setParentId(-1); 
+            groundDevice.x_coord = rand.nextDouble() * 2000.0;
+            groundDevice.y_coord = rand.nextDouble() * 2000.0;
+            fogDevices.add(groundDevice);
 
-        // --- SENSOR (generates the actual tasks/tuples) ---
-        Sensor sensor = new Sensor("sensor_0", "SENSOR_DATA", userId, appId,
-                new UniformDistribution(SENSOR_TRANSMISSION_TIME - 3.0, SENSOR_TRANSMISSION_TIME + 3.0));
-        sensor.setGatewayDeviceId(groundDevice.getId());
-        sensor.setLatency(1.0); // 1ms sensor-to-device latency
-        sensors.add(sensor);
+            // --- SENSOR (generates tasks via Poisson Process) ---
+            Sensor sensor = new Sensor("sensor_" + i, "SENSOR_DATA", userId, appId,
+                    new PoissonDistribution(SENSOR_TRANSMISSION_TIME));
+            sensor.setGatewayDeviceId(groundDevice.getId());
+            sensor.setLatency(1.0);
+            sensors.add(sensor);
 
-        // --- ACTUATOR (receives results) ---
-        Actuator actuator = new Actuator("actuator_0", userId, appId, "ACTUATOR_CMD");
-        actuator.setGatewayDeviceId(groundDevice.getId());
-        actuator.setLatency(1.0);
-        actuators.add(actuator);
+            // --- ACTUATOR (receives results) ---
+            Actuator actuator = new Actuator("actuator_" + i, userId, appId, "ACTUATOR_CMD");
+            actuator.setGatewayDeviceId(groundDevice.getId());
+            actuator.setLatency(1.0);
+            actuators.add(actuator);
+        }
     }
 
     /**
@@ -173,20 +214,14 @@ public class FANETSimulation {
         // Define app modules (processing stages)
         application.addAppModule("sensor_module", 10);       // runs on ground device
         application.addAppModule("processing_module", 10);   // runs on UAV (edge)
-        application.addAppModule("storage_module", 10);      // runs on cloud
 
         // Define data flow edges between modules
-        // Sensor → sensor_module: raw sensor data (1000 bits, 500 MI to process)
-        application.addAppEdge("SENSOR_DATA", "sensor_module", 1000, 500,
+        application.addAppEdge("SENSOR_DATA", "sensor_module", 100, 50,
                 "SENSOR_DATA", Tuple.UP, AppEdge.SENSOR);
 
         // sensor_module → processing_module: preprocessed data
-        application.addAppEdge("sensor_module", "processing_module", 2000, 1000,
+        application.addAppEdge("sensor_module", "processing_module", 100, 50,
                 "PREPROCESSED_DATA", Tuple.UP, AppEdge.MODULE);
-
-        // processing_module → storage_module: processed result
-        application.addAppEdge("processing_module", "storage_module", 500, 200,
-                "RESULT_DATA", Tuple.UP, AppEdge.MODULE);
 
         // processing_module → actuator: command output
         application.addAppEdge("processing_module", "ACTUATOR_CMD", 100, 50,
@@ -194,8 +229,6 @@ public class FANETSimulation {
 
         // Define selectivity (how many output tuples per input tuple)
         application.addTupleMapping("sensor_module", "SENSOR_DATA", "PREPROCESSED_DATA",
-                new FractionalSelectivity(1.0));
-        application.addTupleMapping("processing_module", "PREPROCESSED_DATA", "RESULT_DATA",
                 new FractionalSelectivity(1.0));
         application.addTupleMapping("processing_module", "PREPROCESSED_DATA", "ACTUATOR_CMD",
                 new FractionalSelectivity(1.0));

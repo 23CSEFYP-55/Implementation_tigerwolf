@@ -245,6 +245,7 @@ public class Application {
 						tuple.setSrcModuleName(edge.getSource());
 						tuple.setDirection(edge.getDirection());
 						tuple.setTupleType(edge.getTupleType());
+						tuple.setSourceDeviceId(sourceDeviceId);
 						tuple.setSourceModuleId(sourceModuleId);
 						tuple.setTraversedMicroservices(inputTuple.getTraversed());
 

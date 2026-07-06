@@ -6,51 +6,104 @@ import java.util.*;
 
 public class MOGSMatching {
 
+    // MDs rank UAVs in range
     public static void runMatching(List<Tuple> tasks, List<FogDevice> uavs) {
         Queue<Tuple> unassignedTasks = new LinkedList<>(tasks);
 
-        // Map for quick UAV lookup by ID
-        Map<Integer, FogDevice> uavMap = new HashMap<>();
-        for (FogDevice uav : uavs) {
-            uavMap.put(uav.getId(), uav);
+        // 1. Active Party: MDs Rank UAVs
+        for (Tuple task : tasks) {
+            task.preferredUAVs = new ArrayList<>();
+            Map<Integer, Double> uavScores = new HashMap<>();
+            
+            FogDevice md = getMdForTask(task);
+            if (md == null) continue;
+            
+            for (FogDevice uav : uavs) {
+                double dist = Math.sqrt(Math.pow(uav.x_coord - md.x_coord, 2) + Math.pow(uav.y_coord - md.y_coord, 2));
+                if (dist <= uav.coverageRadius) {
+                    double r_up = 1.0 / (1.0 + dist);
+                    double r_down = 1.0 / (1.0 + dist);
+                    double load_penalty = 1.0 / (1.0 + uav.acceptedTasks.size());
+                    
+                    double alpha = 0.4, beta = 0.4, gamma = 0.2;
+                    double score = alpha * r_up + beta * r_down + gamma * load_penalty;
+                    
+                    uavScores.put(uav.getId(), score);
+                }
+            }
+            
+            if (uavScores.isEmpty()) {
+                // System.out.println("MOGS DEBUG: Task " + task.getCloudletId() + " has no UAVs in range. MD: " + md.getName() + " coords: " + md.x_coord + "," + md.y_coord);
+            }
+            
+            List<Integer> sortedUavs = new ArrayList<>(uavScores.keySet());
+            sortedUavs.sort((id1, id2) -> Double.compare(uavScores.get(id2), uavScores.get(id1)));
+            task.preferredUAVs = sortedUavs;
+            task.currentProposalIndex = 0;
         }
+
+        // 2. MOGS Matching Process
+        Map<Integer, FogDevice> uavMap = new HashMap<>();
+        for (FogDevice uav : uavs) uavMap.put(uav.getId(), uav);
 
         while (!unassignedTasks.isEmpty()) {
             Tuple task = unassignedTasks.poll();
 
-            // If task proposed to all UAVs and was rejected by all, mark as null (send to cloud)
             if (task.currentProposalIndex >= task.preferredUAVs.size()) {
-                task.assignedUavId = null;
+                task.assignedUavId = null; // Rejected by all in range
                 continue;
             }
 
-            // Task proposes to its current top choice
             int targetUavId = task.preferredUAVs.get(task.currentProposalIndex);
             FogDevice targetUav = uavMap.get(targetUavId);
             task.currentProposalIndex++;
 
-            // UAV tentatively accepts the proposal
-            targetUav.acceptedTasks.add(task);
-
-            // UAV sorts its accepted tasks based on its own preferences (descending score)
-            targetUav.acceptedTasks.sort((t1, t2) -> {
-                int score1 = targetUav.taskScores.getOrDefault(t1.getCloudletId(), 0);
-                int score2 = targetUav.taskScores.getOrDefault(t2.getCloudletId(), 0);
-                return Integer.compare(score2, score1);
-            });
-
-            // Enforce UAV capacity limit
-            while (targetUav.acceptedTasks.size() > targetUav.taskCapacity) {
-                // Kick out the lowest ranked task (the last one in the sorted list)
-                Tuple rejectedTask = targetUav.acceptedTasks.remove(targetUav.acceptedTasks.size() - 1);
-                rejectedTask.assignedUavId = null;
-                unassignedTasks.add(rejectedTask); // Goes back into queue to try its next choice
+            // Passive Party: UAV Accepts based on Latency and Queue
+            // High/Low load state check
+            if (targetUav.acceptedTasks.size() < targetUav.taskCapacity) {
+                targetUav.acceptedTasks.add(task);
+                PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+            } else {
+                // P2P Offloading logic: Try to offload to a low-load peer
+                boolean offloaded = false;
+                for (FogDevice peer : uavs) {
+                    if (peer.getId() != targetUav.getId() && peer.acceptedTasks.size() < peer.taskCapacity) {
+                        double distToPeer = Math.sqrt(Math.pow(uavMap.get(targetUavId).x_coord - peer.x_coord, 2) + 
+                                                      Math.pow(uavMap.get(targetUavId).y_coord - peer.y_coord, 2));
+                        // If within comm range (e.g. 150m)
+                        if (distToPeer < 150.0) {
+                            peer.acceptedTasks.add(task);
+                            task.assignedUavId = peer.getId();
+                            PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                            targetUav.tasksOffloaded++; // Increment offloaded count
+                            offloaded = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!offloaded) {
+                    // Reject, goes back in queue to try next choice
+                    unassignedTasks.add(task);
+                }
             }
-
-            // Update assignment status for tasks that survived the cut
-            for (Tuple accepted : targetUav.acceptedTasks) {
-                accepted.assignedUavId = targetUav.getId();
+        }
+        
+        for (FogDevice uav : uavs) {
+            for (Tuple accepted : uav.acceptedTasks) {
+                if (accepted.assignedUavId == null) {
+                    accepted.assignedUavId = uav.getId();
+                }
             }
+        }
+    }
+    
+    private static FogDevice getMdForTask(Tuple task) {
+        try {
+            int srcId = task.getSourceDeviceId();
+            return (FogDevice) org.cloudbus.cloudsim.core.CloudSim.getEntity(srcId);
+        } catch (Exception e) {
+            return null;
         }
     }
 }
