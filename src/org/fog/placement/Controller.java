@@ -21,6 +21,7 @@ import org.fog.utils.FogEvents;
 import org.fog.utils.FogUtils;
 import org.fog.utils.NetworkUsageMonitor;
 import org.fog.utils.TimeKeeper;
+import org.fog.fanet.TaskScheduler;
 
 public class Controller extends SimEntity {
 
@@ -37,6 +38,12 @@ public class Controller extends SimEntity {
 	private Map<String, ModulePlacement> appModulePlacementPolicy;
 
 	protected Map<String, Integer> uavQueueTracker = new HashMap<>();
+	private TaskScheduler taskScheduler;
+	
+	public long systemTotalScheduled = 0;
+	public long systemTotalDropped = 0;
+	public long totalSchedulingTimeNs = 0;
+	public long schedulingInvocations = 0;
 
 	public Controller(String name, List<FogDevice> fogDevices, List<Sensor> sensors, List<Actuator> actuators) {
 		super(name);
@@ -110,8 +117,8 @@ public class Controller extends SimEntity {
 			Tuple tuple = (Tuple) ev.getData();
 			taskWaitingPool.add(tuple);
 			if (taskWaitingPool.size() >= 100) {
-				System.out.println("--- Batch of 100 tasks reached! Running MOGS Matching ---");
-				runFanetMOGSScheduling();
+				System.out.println("--- Batch of 100 tasks reached! Running Task Scheduling ---");
+				runTaskScheduling();
 			}
 
 		} else {
@@ -309,7 +316,7 @@ public class Controller extends SimEntity {
 		}
 	}
 
-	public void runFanetMOGSScheduling() {
+	public void runTaskScheduling() {
 		if (taskWaitingPool.isEmpty())
 			return;
 
@@ -327,17 +334,31 @@ public class Controller extends SimEntity {
 		// 2. Trajectory Optimization via TF-PPO Python Server
 		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
 
-		// 3. Local Java MOGS Task Scheduling
-		org.fog.fanet.MOGSMatching.runMatching(taskWaitingPool, uavs);
+		// 3. Local Java Task Scheduling
+		long startNs = System.nanoTime();
+		if (taskScheduler != null) {
+			taskScheduler.scheduleTasks(taskWaitingPool, uavs);
+		} else {
+			System.out.println("WARNING: No TaskScheduler configured in Controller!");
+		}
+		long endNs = System.nanoTime();
+		this.totalSchedulingTimeNs += (endNs - startNs);
+		this.schedulingInvocations++;
 
 		// 4. Physically route the Tuples
+		int scheduledInBatch = 0;
+		int droppedInBatch = 0;
 		for (Tuple task : taskWaitingPool) {
 			if (task.assignedUavId != null) {
 				sendNow(task.assignedUavId, FogEvents.TUPLE_ARRIVAL, task);
+				scheduledInBatch++;
 			} else {
-				System.out.println("Task " + task.getCloudletId() + " dropped (No UAVs in range or swamped)");
+				// System.out.println("Task " + task.getCloudletId() + " dropped (No UAVs in range or swamped)");
+				droppedInBatch++;
 			}
 		}
+		this.systemTotalScheduled += scheduledInBatch;
+		this.systemTotalDropped += droppedInBatch;
 
 		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();
@@ -400,5 +421,9 @@ public class Controller extends SimEntity {
 
 	public void setAppModulePlacementPolicy(Map<String, ModulePlacement> appModulePlacementPolicy) {
 		this.appModulePlacementPolicy = appModulePlacementPolicy;
+	}
+
+	public void setTaskScheduler(TaskScheduler taskScheduler) {
+		this.taskScheduler = taskScheduler;
 	}
 }

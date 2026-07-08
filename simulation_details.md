@@ -43,3 +43,35 @@ To maximize system throughput, UAVs employ Peer-to-Peer (P2P) offloading. When a
 5. **MOGS Scheduling Loop**: When the task batch reaches a threshold, Java executes the MOGS matching algorithm to route tasks to specific UAVs.
 6. **Task Processing**: Tasks are sent to the assigned UAVs via `FogEvents.TUPLE_ARRIVAL`, processed via the UAVs' CloudletScheduler, and removed from the active load once completed.
 7. **Benchmarking**: Upon simulation termination, a comprehensive ASCII dashboard is printed detailing system throughput, latency, energy consumption, and total P2P tasks offloaded per UAV.
+
+## 6. PPO Global and Local Models (Deep Dive)
+
+The Python RL agent implements a **Centralized Training with Decentralized Execution (CTDE)** architecture using PyTorch (`tf_ppo_model.py`). This architecture aims to solve multi-agent coordination by having a global perspective during training, but allowing UAVs to act independently based on their local observations during execution.
+
+### The Local Models (Decentralized Actors)
+- **Architecture**: Each UAV is assigned its own independent Actor network (`UAVActor`).
+- **Input (Local State)**: The network takes a 5-dimensional local observation vector containing only the UAV's specific data: `[x, y, z, load, mds_in_range]`.
+- **Output (Action)**: It outputs the mean and standard deviation for a continuous action space (dx, dy, dz), which is scaled to a maximum movement distance of 50.0m per step.
+- **Execution Role**: During the simulation, the local models are actively used to dictate the individual trajectory (flight path) of each UAV independently without needing to know the state of the entire swarm.
+
+### The Global Model (Centralized Critic)
+- **Architecture**: A single, shared Critic network (`GlobalCritic`).
+- **Input (Global State)**: The network takes the flattened, concatenated states of *all* UAVs in the swarm (`state_dim * num_uavs`).
+- **Output (Value)**: It outputs a single scalar value representing the estimated "goodness" (expected discounted return) of the entire swarm's current joint state.
+- **Training Role**: The Critic is used *strictly* for training. It evaluates the actions taken by the local actors and calculates the Advantage (how much better or worse the actions were compared to the expected baseline). This advantage is used to calculate the loss and update the weights of the decentralized actors.
+
+### Where and How it is Trained
+- **Location**: The models are instantiated and trained entirely on the Python server (`fanet_ppo_server.py`).
+- **The Loop**: 
+  1. The Java iFogSim simulation acts as the environment, calculating the state of the simulation and a joint `reward` float.
+  2. Java sends the state and reward to Python over the TCP socket as a JSON string.
+  3. Python stores the transitions (state, action, log probability, reward) in an experience buffer.
+  4. **Online Training**: Once the buffer accumulates 64 steps, the PPO `update()` function is triggered. The Global Critic is updated to minimize the mean squared error (MSE) of its value predictions, while the Local Actors are updated using the PPO clipped surrogate objective function to maximize the expected reward based on the Critic's advantage estimates. The buffer is then cleared.
+
+### What is Lacking in the Current Implementation
+While the CTDE setup is standard for Multi-Agent Reinforcement Learning (MARL), the current repository implementation has several significant limitations:
+
+1. **Decoupled from Task Scheduling**: The PPO model *only* controls UAV movement. It is entirely blind to the MOGS task scheduling algorithm running in Java. True joint optimization (learning to move *to* optimize offloading/MOGS matching) is difficult because the RL agent cannot control or explicitly observe the network topology decisions being made.
+2. **Credit Assignment Problem**: The Java simulation sends a single global `reward` scalar for the entire swarm. The Actors receive this shared reward, meaning a UAV that made a poor movement decision might be positively reinforced if the rest of the swarm performed well. It lacks localized, per-UAV reward shaping.
+3. **No Inter-Agent Communication or Observation**: The Actor networks only observe their own `[x, y, z, load, mds_in_range]`. They do not observe the positions of neighboring UAVs. This makes learning cooperative behaviors (like collision avoidance or spatial load distribution) extremely difficult, as they must infer swarm dynamics solely from the global reward signal.
+4. **Online Training Instability**: The script trains the model *online* from scratch upon connection. Deep RL typically requires millions of episodes to converge. Running PPO online from random initialization during a discrete-event simulation run will likely result in unstable, random-walk trajectories unless pre-trained weights are loaded (which the script currently does not support).

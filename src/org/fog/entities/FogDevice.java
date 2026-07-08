@@ -25,7 +25,7 @@ public class FogDevice extends PowerDatacenter {
     protected Queue<Tuple> northTupleQueue;
     protected Queue<Pair<Tuple, Integer>> southTupleQueue;
 
-    // --- Custom FANET & MOGS Variables ---
+    // --- Custom FANET & Scheduling Variables ---
     public double x_coord;
     public double y_coord;
     public int completedTasks = 0;
@@ -717,22 +717,22 @@ public class FogDevice extends PowerDatacenter {
     protected void processTupleArrival(SimEvent ev) {
         Tuple tuple = (Tuple) ev.getData();
 
-        // --- MOGS INTERCEPTOR ---
+        // --- SCHEDULING INTERCEPTOR ---
         if (getName().startsWith("uav") && tuple.getDirection() == Tuple.UP && tuple.assignedUavId == null) {
             org.fog.placement.Controller.taskWaitingPool.add(tuple);
             if (org.fog.placement.Controller.taskWaitingPool.size() >= 20) {
-                System.out.println("--- Batch of 5 tasks reached! Running MOGS Matching ---");
+                System.out.println("--- Batch of 5 tasks reached! Running Task Scheduling ---");
                 for (org.cloudbus.cloudsim.core.SimEntity entity : org.cloudbus.cloudsim.core.CloudSim
                         .getEntityList()) {
                     if (entity instanceof org.fog.placement.Controller) {
-                        ((org.fog.placement.Controller) entity).runFanetMOGSScheduling();
+                        ((org.fog.placement.Controller) entity).runTaskScheduling();
                         break;
                     }
                 }
             }
             return;
         }
-        // --- END MOGS INTERCEPTOR ---
+        // --- END SCHEDULING INTERCEPTOR ---
 
         if (getName().equals("cloud")) {
             updateCloudTraffic();
@@ -947,7 +947,7 @@ public class FogDevice extends PowerDatacenter {
             if (org.fog.placement.Controller.taskWaitingPool.size() >= 100) {
                 for (org.cloudbus.cloudsim.core.SimEntity entity : org.cloudbus.cloudsim.core.CloudSim.getEntityList()) {
                     if (entity instanceof org.fog.placement.Controller) {
-                        ((org.fog.placement.Controller) entity).runFanetMOGSScheduling();
+                        ((org.fog.placement.Controller) entity).runTaskScheduling();
                         break;
                     }
                 }

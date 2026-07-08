@@ -4,10 +4,10 @@ import org.fog.entities.FogDevice;
 import org.fog.entities.Tuple;
 import java.util.*;
 
-public class MOGSMatching {
+public class MOGSScheduler implements TaskScheduler {
 
-    // MDs rank UAVs in range
-    public static void runMatching(List<Tuple> tasks, List<FogDevice> uavs) {
+    @Override
+    public void scheduleTasks(List<Tuple> tasks, List<FogDevice> uavs) {
         Queue<Tuple> unassignedTasks = new LinkedList<>(tasks);
 
         // 1. Active Party: MDs Rank UAVs
@@ -60,24 +60,27 @@ public class MOGSMatching {
 
             // Passive Party: UAV Accepts based on Latency and Queue
             // High/Low load state check
-            if (targetUav.acceptedTasks.size() < targetUav.taskCapacity) {
+            if (targetUav.acceptedTasks.size() < targetUav.taskCapacity && checkLatencyConstraint(targetUav, task)) {
                 targetUav.acceptedTasks.add(task);
                 PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
             } else {
                 // P2P Offloading logic: Try to offload to a low-load peer
                 boolean offloaded = false;
                 for (FogDevice peer : uavs) {
-                    if (peer.getId() != targetUav.getId() && peer.acceptedTasks.size() < peer.taskCapacity) {
-                        double distToPeer = Math.sqrt(Math.pow(uavMap.get(targetUavId).x_coord - peer.x_coord, 2) + 
-                                                      Math.pow(uavMap.get(targetUavId).y_coord - peer.y_coord, 2));
-                        // If within comm range (e.g. 150m)
-                        if (distToPeer < 150.0) {
-                            peer.acceptedTasks.add(task);
-                            task.assignedUavId = peer.getId();
-                            PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
-                            targetUav.tasksOffloaded++; // Increment offloaded count
-                            offloaded = true;
-                            break;
+                    if (peer.getId() != targetUav.getId()) {
+                        System.out.println("DEBUG: P2P Evaluation - targetUav " + targetUav.getName() + " queue full. Evaluating peer " + peer.getName() + " queue size: " + peer.acceptedTasks.size());
+                        if (peer.acceptedTasks.size() < peer.taskCapacity && checkLatencyConstraint(peer, task)) {
+                            double distToPeer = Math.sqrt(Math.pow(uavMap.get(targetUavId).x_coord - peer.x_coord, 2) + 
+                                                          Math.pow(uavMap.get(targetUavId).y_coord - peer.y_coord, 2));
+                            // If within comm range (e.g. 500m)
+                            if (distToPeer < 500.0) {
+                                peer.acceptedTasks.add(task);
+                                task.assignedUavId = peer.getId();
+                                PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                                targetUav.tasksOffloaded++; // Increment offloaded count
+                                offloaded = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -98,12 +101,26 @@ public class MOGSMatching {
         }
     }
     
-    private static FogDevice getMdForTask(Tuple task) {
+    private FogDevice getMdForTask(Tuple task) {
         try {
             int srcId = task.getSourceDeviceId();
             return (FogDevice) org.cloudbus.cloudsim.core.CloudSim.getEntity(srcId);
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    private boolean checkLatencyConstraint(FogDevice uav, Tuple task) {
+        double currentDataRate = 6250000.0; // 50 Mbps in bytes/sec
+        double transmissionDelayMs = (task.getCloudletFileSize() / currentDataRate) * 1000.0;
+        
+        double uavMips = uav.getHost().getTotalMips();
+        double totalMiInQueue = 0.0;
+        for (Tuple t : uav.acceptedTasks) totalMiInQueue += t.getCloudletLength();
+        
+        double predictedQueueDelayMs = ((totalMiInQueue + task.getCloudletLength()) / uavMips) * 1000.0;
+        double totalPredictedLatency = transmissionDelayMs + predictedQueueDelayMs;
+        
+        return totalPredictedLatency <= task.tolerantLatency;
     }
 }

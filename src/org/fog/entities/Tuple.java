@@ -21,6 +21,7 @@ public class Tuple extends Cloudlet{
 	public Integer assignedUavId = null;
 	public double tupleDataSize = 1000.0; // Simulated data size for utility math
 	public double tupleCpuCycles = 2000.0; // Simulated CPU cycles for utility math
+	public double tolerantLatency = 200.0 + (Math.random() * 300.0); // 200ms to 500ms deadline
 	// --------------------------------------
 	
 	private String tupleType;
@@ -59,6 +60,7 @@ public class Tuple extends Cloudlet{
 		setSourceDeviceId(-1);
 		setModuleCopyMap(new HashMap<String, Integer>());
 		setDestinationDeviceId(-1);
+        this.tupleDataSize = cloudletFileSize; // Sync data size
 	}
 
 	public int getActualTupleId() {
