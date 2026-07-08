@@ -90,6 +90,9 @@ public class Controller extends SimEntity {
 		send(getId(), Config.MAX_SIMULATION_TIME, FogEvents.STOP_SIMULATION);
 		for (FogDevice dev : getFogDevices())
 			sendNow(dev.getId(), FogEvents.RESOURCE_MGMT);
+		
+		// Start TF-PPO Sync loop every 10ms
+		send(getId(), 10.0, FogEvents.TF_PPO_SYNC);
 	}
 
 	@Override
@@ -100,6 +103,9 @@ public class Controller extends SimEntity {
 
 		} else if (_tag_ == FogEvents.TUPLE_FINISHED) {
 			processTupleFinished(ev);
+
+		} else if (_tag_ == FogEvents.TF_PPO_SYNC) {
+			processTFPpoSync();
 
 		} else if (_tag_ == FogEvents.CONTROLLER_RESOURCE_MANAGE) {
 			manageResources();
@@ -125,6 +131,22 @@ public class Controller extends SimEntity {
 			// ignore unexpected events
 		}
 
+	}
+	
+	private void processTFPpoSync() {
+		java.util.List<FogDevice> uavs = new java.util.ArrayList<>();
+		java.util.List<FogDevice> mds = new java.util.ArrayList<>();
+		for (FogDevice device : getFogDevices()) {
+			if (device.getName().startsWith("uav")) {
+				uavs.add(device);
+			} else if (device.getName().startsWith("ground_device_")) {
+				mds.add(device);
+			}
+		}
+		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
+		
+		// Schedule next sync in 10ms
+		send(getId(), 10.0, FogEvents.TF_PPO_SYNC);
 	}
 
 	private void printNetworkUsageDetails() {
@@ -330,9 +352,6 @@ public class Controller extends SimEntity {
 				mds.add(device);
 			}
 		}
-
-		// 2. Trajectory Optimization via TF-PPO Python Server
-		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
 
 		// 3. Local Java Task Scheduling
 		long startNs = System.nanoTime();

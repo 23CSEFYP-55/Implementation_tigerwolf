@@ -51,18 +51,25 @@ public class PreferenceBuilder {
             for (int i = 0; i < uavs.size(); i++) {
                 FogDevice uav = uavs.get(i);
                 
-                // Calculate MDs in range
-                int mdsInRange = 0;
+                // Calculate MDs in range using 8-sector mapping
+                int[] sectors = new int[8];
                 for (FogDevice md : mds) {
-                    double dist = Math.sqrt(Math.pow(uav.x_coord - md.x_coord, 2) + Math.pow(uav.y_coord - md.y_coord, 2));
+                    double dx = md.x_coord - uav.x_coord;
+                    double dy = md.y_coord - uav.y_coord;
+                    double dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist <= uav.coverageRadius) {
-                        mdsInRange++;
+                        double angle = Math.atan2(dy, dx);
+                        if (angle < 0) angle += 2 * Math.PI;
+                        int sector = (int) (angle / (Math.PI / 4.0));
+                        if (sector >= 8) sector = 7;
+                        sectors[sector]++;
                     }
                 }
                 
                 uavJsonBuilder.append(String.format(
-                    "{\"id\": \"%s\", \"x\": %f, \"y\": %f, \"z\": %f, \"load\": %d, \"mds_in_range\": %d}",
-                    uav.getName(), uav.x_coord, uav.y_coord, 50.0, uav.acceptedTasks.size(), mdsInRange
+                    "{\"id\": \"%s\", \"x\": %f, \"y\": %f, \"z\": %f, \"load\": %d, \"mds_n\": %d, \"mds_ne\": %d, \"mds_e\": %d, \"mds_se\": %d, \"mds_s\": %d, \"mds_sw\": %d, \"mds_w\": %d, \"mds_nw\": %d}",
+                    uav.getName(), uav.x_coord, uav.y_coord, 50.0, uav.acceptedTasks.size(),
+                    sectors[0], sectors[1], sectors[2], sectors[3], sectors[4], sectors[5], sectors[6], sectors[7]
                 ));
                 if (i < uavs.size() - 1) uavJsonBuilder.append(", ");
             }
@@ -85,17 +92,16 @@ public class PreferenceBuilder {
                 for (String part : parts) {
                     if (part.contains("\"id\"")) {
                         String id = extractJsonString(part, "id");
-                        double dx = extractJsonDouble(part, "dx");
-                        double dy = extractJsonDouble(part, "dy");
-                        double dz = extractJsonDouble(part, "dz");
+                        double angle = extractJsonDouble(part, "angle");
+                        double distance = extractJsonDouble(part, "distance");
                         
                         for (FogDevice uav : uavs) {
                             if (uav.getName().equals(id)) {
-                                uav.x_coord += dx;
-                                uav.y_coord += dy;
+                                uav.x_coord += distance * Math.cos(angle);
+                                uav.y_coord += distance * Math.sin(angle);
                                 // Boundary enforcement
-                                uav.x_coord = Math.max(0, Math.min(2000, uav.x_coord));
-                                uav.y_coord = Math.max(0, Math.min(2000, uav.y_coord));
+                                uav.x_coord = Math.max(0.0, Math.min(2000.0, uav.x_coord));
+                                uav.y_coord = Math.max(0.0, Math.min(2000.0, uav.y_coord));
                                 break;
                             }
                         }

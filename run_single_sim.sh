@@ -2,7 +2,7 @@
 set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
-PYTHON_SERVER="$PROJECT_DIR/ppo_agent/fanet_ppo_server.py"
+PYTHON_SERVER="$PROJECT_DIR/ppo_agent/tf_ppo_server.py"
 
 cleanup() {
     if [ -n "$PYTHON_PID" ]; then
