@@ -29,7 +29,7 @@ import org.fog.placement.Controller;
 import org.fog.placement.ModuleMapping;
 import org.fog.placement.ModulePlacementEdgewards;
 import org.fog.placement.ModulePlacementMOGS;
-import org.fog.fanet.MOGSScheduler;
+import org.fog.fanet.DynamicRepairScheduler;
 import org.fog.policy.AppModuleAllocationPolicy;
 import org.fog.scheduler.StreamOperatorScheduler;
 import org.fog.utils.FogLinearPowerModel;
@@ -55,7 +55,12 @@ public class FANETSimulation {
     static double MAX_SIM_TIME = 5000.0;
 
     public static void main(String[] args) {
-        Log.printLine("========== Starting FANET Simulation with Task Scheduling ==========");
+        String schedulerType = "DYNAMIC"; // Default
+        if (args.length > 0) {
+            schedulerType = args[0];
+        }
+        
+        Log.printLine("========== Starting FANET Simulation with " + schedulerType + " Scheduler ==========");
 
         try {
             // 1. Initialize CloudSim
@@ -81,7 +86,11 @@ public class FANETSimulation {
 
             // 4. Create the Controller (which now has our task scheduling logic)
             masterController = new Controller("master-controller", fogDevices, sensors, actuators);
-            masterController.setTaskScheduler(new MOGSScheduler());
+            if (schedulerType.equalsIgnoreCase("MOGS")) {
+                masterController.setTaskScheduler(new org.fog.fanet.MOGSScheduler());
+            } else {
+                masterController.setTaskScheduler(new DynamicRepairScheduler());
+            }
 
             // 5. Set the module placement policy (EdgeWards = prefer edge/UAV nodes)
             ModuleMapping moduleMapping = ModuleMapping.createModuleMapping();
