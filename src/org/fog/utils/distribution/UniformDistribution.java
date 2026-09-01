@@ -9,6 +9,7 @@ public class UniformDistribution extends Distribution{
 		super();
 		setMin(min);
 		setMax(max);
+		setRandom(new java.util.Random());
 	}
 	
 	@Override

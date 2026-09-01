@@ -2,3 +2,4 @@ numpy
 gymnasium
 stable-baselines3
 torch
+pytest

@@ -25,13 +25,23 @@ public class FogDevice extends PowerDatacenter {
     protected Queue<Tuple> northTupleQueue;
     protected Queue<Pair<Tuple, Integer>> southTupleQueue;
 
-    // --- Custom FANET & MOGS Variables ---
+    // --- Custom FANET & Scheduling Variables ---
     public double x_coord;
     public double y_coord;
-    public int taskCapacity = 10; // Max tasks this UAV can process at once
+    public int completedTasks = 0;
+    public double totalDataProcessed = 0.0;
+    public double totalLatency = 0.0;
+    public int tasksOffloaded = 0;
+    public int taskCapacity = 1000; // Max tasks this UAV can process at once
+    public double coverageRadius = 130.0;
     public java.util.Map<Integer, Integer> taskScores = new java.util.HashMap<>();
     public java.util.List<Tuple> acceptedTasks = new java.util.ArrayList<>();
     // -------------------------------------
+
+    // --- Metric 5: Computation Load Variance ---
+    // Collects a CPU utilization sample (0.0-1.0) on every energy update tick.
+    public java.util.List<Double> utilizationSamples = new java.util.ArrayList<>();
+    // -------------------------------------------
 
     protected List<String> activeApplications;
 
@@ -250,6 +260,16 @@ public class FogDevice extends PowerDatacenter {
     }
 
     @Override
+    protected void processCloudletSubmit(SimEvent ev, boolean ack) {
+        try {
+            super.processCloudletSubmit(ev, ack);
+        } catch (Exception e) {
+            System.err.println("Exception in processCloudletSubmit for " + getName());
+            e.printStackTrace();
+        }
+    }
+
+    @Override
     protected void processOtherEvent(SimEvent ev) {
         org.cloudbus.cloudsim.core.CloudSimTags _tag_ = ev.getTag();
         if (_tag_ == FogEvents.TUPLE_ARRIVAL) {
@@ -305,7 +325,7 @@ public class FogDevice extends PowerDatacenter {
             processClustering(this.getParentId(), this.getId(), ev);
 
         } else {
-
+            super.processOtherEvent(ev);
         }
 
     }
@@ -520,6 +540,14 @@ public class FogDevice extends PowerDatacenter {
                         cloudletCompleted = true;
                         Tuple tuple = (Tuple) cl;
                         TimeKeeper.getInstance().tupleEndedExecution(tuple);
+                        
+                        this.completedTasks++;
+                        this.totalDataProcessed += tuple.getCloudletFileSize(); // in bytes
+                        Double emitTime = TimeKeeper.getInstance().getEmitTimes().get(tuple.getActualTupleId());
+                        if (emitTime != null) {
+                            this.totalLatency += (org.cloudbus.cloudsim.core.CloudSim.clock() - emitTime);
+                        }
+                        
                         Application application = getApplicationMap().get(tuple.getAppId());
                         Logger.debug(getName(), "Completed execution of tuple " + tuple.getCloudletId() + "on "
                                 + tuple.getDestModuleName());
@@ -622,16 +650,6 @@ public class FogDevice extends PowerDatacenter {
                 + (timeNow - lastUtilizationUpdateTime) * getHost().getPowerModel().getPower(lastUtilization);
         setEnergyConsumption(newEnergyConsumption);
 
-        /*
-         * if(getName().equals("d-0")){
-         * System.out.println("------------------------");
-         * System.out.println("Utilization = "+lastUtilization);
-         * System.out.println("Power = "+getHost().getPowerModel().getPower(
-         * lastUtilization));
-         * System.out.println(timeNow-lastUtilizationUpdateTime);
-         * }
-         */
-
         double currentCost = getTotalCost();
         double newcost = currentCost
                 + (timeNow - lastUtilizationUpdateTime) * getRatePerMips() * lastUtilization * getHost().getTotalMips();
@@ -639,6 +657,10 @@ public class FogDevice extends PowerDatacenter {
 
         lastUtilization = Math.min(1, totalMipsAllocated / getHost().getTotalMips());
         lastUtilizationUpdateTime = timeNow;
+
+        // --- Metric 5: Record utilization sample for load-variance computation ---
+        utilizationSamples.add(lastUtilization);
+        // ------------------------------------------------------------------------
     }
 
     protected void processAppSubmit(SimEvent ev) {
@@ -695,23 +717,22 @@ public class FogDevice extends PowerDatacenter {
     protected void processTupleArrival(SimEvent ev) {
         Tuple tuple = (Tuple) ev.getData();
 
-        // --- MOGS INTERCEPTOR ---
+        // --- SCHEDULING INTERCEPTOR ---
         if (getName().startsWith("uav") && tuple.getDirection() == Tuple.UP && tuple.assignedUavId == null) {
-            System.out.println("DEBUG: UAV " + getName() + " intercepted tuple " + tuple.getCloudletId());
             org.fog.placement.Controller.taskWaitingPool.add(tuple);
             if (org.fog.placement.Controller.taskWaitingPool.size() >= 20) {
-                System.out.println("--- Batch of 5 tasks reached! Running MOGS Matching ---");
+                System.out.println("--- Batch of 5 tasks reached! Running Task Scheduling ---");
                 for (org.cloudbus.cloudsim.core.SimEntity entity : org.cloudbus.cloudsim.core.CloudSim
                         .getEntityList()) {
                     if (entity instanceof org.fog.placement.Controller) {
-                        ((org.fog.placement.Controller) entity).runFanetMOGSScheduling();
+                        ((org.fog.placement.Controller) entity).runTaskScheduling();
                         break;
                     }
                 }
             }
             return;
         }
-        // --- END MOGS INTERCEPTOR ---
+        // --- END SCHEDULING INTERCEPTOR ---
 
         if (getName().equals("cloud")) {
             updateCloudTraffic();
@@ -769,6 +790,7 @@ public class FogDevice extends PowerDatacenter {
                     if (((AppModule) vm).getName().equals(tuple.getDestModuleName()))
                         vmId = vm.getId();
                 }
+                
                 if (vmId < 0
                         || (tuple.getModuleCopyMap().containsKey(tuple.getDestModuleName()) &&
                                 tuple.getModuleCopyMap().get(tuple.getDestModuleName()) != vmId)) {
@@ -851,6 +873,7 @@ public class FogDevice extends PowerDatacenter {
         updateAllocatedMips(moduleName);
         processCloudletSubmit(ev, false);
         updateAllocatedMips(moduleName);
+    }
         /*
          * for(Vm vm : getHost().getVmList()){
          * Logger.error(getName(),
@@ -858,7 +881,6 @@ public class FogDevice extends PowerDatacenter {
          * getTotalAllocatedMipsForVm(vm));
          * }
          */
-    }
 
     protected void processModuleArrival(SimEvent ev) {
         AppModule module = (AppModule) ev.getData();
@@ -919,6 +941,16 @@ public class FogDevice extends PowerDatacenter {
                 sendUpFreeLink(tuple);
             } else {
                 northTupleQueue.add(tuple);
+            }
+        } else if (getName().startsWith("ground_device")) {
+            org.fog.placement.Controller.taskWaitingPool.add(tuple);
+            if (org.fog.placement.Controller.taskWaitingPool.size() >= 100) {
+                for (org.cloudbus.cloudsim.core.SimEntity entity : org.cloudbus.cloudsim.core.CloudSim.getEntityList()) {
+                    if (entity instanceof org.fog.placement.Controller) {
+                        ((org.fog.placement.Controller) entity).runTaskScheduling();
+                        break;
+                    }
+                }
             }
         }
     }

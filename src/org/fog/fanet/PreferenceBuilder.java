@@ -4,12 +4,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
 import org.fog.entities.FogDevice;
-import org.fog.entities.Tuple;
+import org.cloudbus.cloudsim.core.CloudSim;
 
 public class PreferenceBuilder {
 
@@ -17,14 +14,13 @@ public class PreferenceBuilder {
     private static PrintWriter out;
     private static BufferedReader in;
     
-    // The tracker the Controller uses
-    public static Map<String, Integer> uavQueueTracker = new HashMap<>();
+    // Reward accumulated since last step
+    public static double accumulatedThroughput = 0.0;
 
     public static void connectToPPO() {
         try {
-            // MATCHED TO PYTHON PORT 5000
-            System.out.println("Attempting to connect to Python TF-PPO Server on port 5000...");
-            socket = new Socket("127.0.0.1", 5000);
+            System.out.println("Attempting to connect to Python TF-PPO Server on port 5500...");
+            socket = new Socket("127.0.0.1", 5500);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             System.out.println("SUCCESS: Connected to Python Server!");
@@ -35,71 +31,80 @@ public class PreferenceBuilder {
 
     public static void disconnectFromPPO() {
         try {
-            if (out != null) {
-                out.println("CLOSE\n"); 
-            }
-            if (socket != null) {
-                socket.close();
-            }
+            if (out != null) out.println("CLOSE\n"); 
+            if (socket != null) socket.close();
             System.out.println("Disconnected from Python PPO Server.");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void buildPreferences(List<Tuple> tasks, List<FogDevice> uavs) {
+    public static void updateTrajectories(List<FogDevice> uavs, List<FogDevice> mds) {
         if (out == null || in == null) {
-            System.out.println("No connection to Python. Skipping RL matching...");
+            System.out.println("No connection to Python. Skipping trajectory update...");
             return;
         }
 
         try {
-            // First, sync our tracker with the TRUE simulator state before the batch starts
-            for (FogDevice uav : uavs) {
-                uavQueueTracker.put(uav.getName(), uav.acceptedTasks.size());
-            }
-
-            // Process each task in the batch
-            for (Tuple task : tasks) {
+            StringBuilder uavJsonBuilder = new StringBuilder();
+            uavJsonBuilder.append("[");
+            for (int i = 0; i < uavs.size(); i++) {
+                FogDevice uav = uavs.get(i);
                 
-                // 1. Build UAV JSON dynamically INSIDE the loop so it has fresh queue numbers
-                StringBuilder uavJsonBuilder = new StringBuilder();
-                uavJsonBuilder.append("[");
-                for (int i = 0; i < uavs.size(); i++) {
-                    FogDevice uav = uavs.get(i);
-                    int currentQueue = uavQueueTracker.getOrDefault(uav.getName(), 0);
-                    
-                    uavJsonBuilder.append(String.format(
-                        "{\"id\": \"%s\", \"mips\": %f, \"queue_size\": %d, \"x\": %f, \"y\": %f}",
-                        uav.getName(), uav.getHost().getTotalMips(), currentQueue, uav.x_coord, uav.y_coord
-                    ));
-                    if (i < uavs.size() - 1) uavJsonBuilder.append(", ");
+                // Calculate MDs in range using 8-sector mapping
+                int[] sectors = new int[8];
+                for (FogDevice md : mds) {
+                    double dx = md.x_coord - uav.x_coord;
+                    double dy = md.y_coord - uav.y_coord;
+                    double dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= uav.coverageRadius) {
+                        double angle = Math.atan2(dy, dx);
+                        if (angle < 0) angle += 2 * Math.PI;
+                        int sector = (int) (angle / (Math.PI / 4.0));
+                        if (sector >= 8) sector = 7;
+                        sectors[sector]++;
+                    }
                 }
-                uavJsonBuilder.append("]");
-
-                // 2. Construct the JSON object
-                String jsonRequest = String.format(
-                    "{\"task_id\": %d, \"task_data_size\": %f, \"task_cpu_cycles\": %f, \"uavs\": %s}",
-                    task.getCloudletId(), (double) task.getCloudletFileSize(), (double) task.getCloudletLength(), uavJsonBuilder.toString()
-                );
-
-                // 3. Send to Python
-                out.println(jsonRequest);
-
-                // 4. Receive the ranked response from Python
-                String response = in.readLine();
                 
-                if (response != null && response.contains("ranked_uavs")) {
-                    String arrayContent = response.substring(response.indexOf("[") + 1, response.indexOf("]"));
-                    String[] rankedIds = arrayContent.replace("\"", "").replace(" ", "").split(",");
-                    
-                    if (rankedIds.length > 0) {
-                        String winningUav = rankedIds[0];
-                        task.assignedUavId = getDeviceIdByName(uavs, winningUav);
+                uavJsonBuilder.append(String.format(
+                    "{\"id\": \"%s\", \"x\": %f, \"y\": %f, \"z\": %f, \"load\": %d, \"mds_n\": %d, \"mds_ne\": %d, \"mds_e\": %d, \"mds_se\": %d, \"mds_s\": %d, \"mds_sw\": %d, \"mds_w\": %d, \"mds_nw\": %d}",
+                    uav.getName(), uav.x_coord, uav.y_coord, 50.0, uav.acceptedTasks.size(),
+                    sectors[0], sectors[1], sectors[2], sectors[3], sectors[4], sectors[5], sectors[6], sectors[7]
+                ));
+                if (i < uavs.size() - 1) uavJsonBuilder.append(", ");
+            }
+            uavJsonBuilder.append("]");
+
+            String jsonRequest = String.format(
+                "{\"reward\": %f, \"uavs\": %s}",
+                accumulatedThroughput, uavJsonBuilder.toString()
+            );
+
+            // Reset reward for next step
+            accumulatedThroughput = 0.0;
+
+            out.println(jsonRequest);
+            String response = in.readLine();
+            
+            if (response != null && response.contains("uav_actions")) {
+                // Parse rudimentary JSON since we don't have a JSON library easily accessible
+                String[] parts = response.split("\\{");
+                for (String part : parts) {
+                    if (part.contains("\"id\"")) {
+                        String id = extractJsonString(part, "id");
+                        double angle = extractJsonDouble(part, "angle");
+                        double distance = extractJsonDouble(part, "distance");
                         
-                        // 5. INSTANT TRACKER UPDATE: Add +1 so the next task in this loop sees it!
-                        int newQueueCount = uavQueueTracker.getOrDefault(winningUav, 0) + 1;
-                        uavQueueTracker.put(winningUav, newQueueCount);
+                        for (FogDevice uav : uavs) {
+                            if (uav.getName().equals(id)) {
+                                uav.x_coord += distance * Math.cos(angle);
+                                uav.y_coord += distance * Math.sin(angle);
+                                // Boundary enforcement
+                                uav.x_coord = Math.max(0.0, Math.min(2000.0, uav.x_coord));
+                                uav.y_coord = Math.max(0.0, Math.min(2000.0, uav.y_coord));
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -107,13 +112,28 @@ public class PreferenceBuilder {
             System.err.println("Error communicating with Python server: " + e.getMessage());
         }
     }
-
-    private static Integer getDeviceIdByName(List<FogDevice> uavs, String name) {
-        for (FogDevice uav : uavs) {
-            if (uav.getName().equals(name)) {
-                return uav.getId();
-            }
+    
+    private static String extractJsonString(String json, String key) {
+        String search = "\"" + key + "\": \"";
+        int start = json.indexOf(search);
+        if (start == -1) return "";
+        start += search.length();
+        int end = json.indexOf("\"", start);
+        return json.substring(start, end);
+    }
+    
+    private static double extractJsonDouble(String json, String key) {
+        String search = "\"" + key + "\": ";
+        int start = json.indexOf(search);
+        if (start == -1) return 0.0;
+        start += search.length();
+        int end = json.indexOf(",", start);
+        if (end == -1) end = json.indexOf("}", start);
+        if (end == -1) return 0.0;
+        try {
+            return Double.parseDouble(json.substring(start, end).trim());
+        } catch (Exception e) {
+            return 0.0;
         }
-        return null;
     }
 }

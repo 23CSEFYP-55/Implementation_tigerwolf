@@ -21,6 +21,7 @@ import org.fog.utils.FogEvents;
 import org.fog.utils.FogUtils;
 import org.fog.utils.NetworkUsageMonitor;
 import org.fog.utils.TimeKeeper;
+import org.fog.fanet.TaskScheduler;
 
 public class Controller extends SimEntity {
 
@@ -37,6 +38,12 @@ public class Controller extends SimEntity {
 	private Map<String, ModulePlacement> appModulePlacementPolicy;
 
 	protected Map<String, Integer> uavQueueTracker = new HashMap<>();
+	private TaskScheduler taskScheduler;
+	
+	public long systemTotalScheduled = 0;
+	public long systemTotalDropped = 0;
+	public long totalSchedulingTimeNs = 0;
+	public long schedulingInvocations = 0;
 
 	public Controller(String name, List<FogDevice> fogDevices, List<Sensor> sensors, List<Actuator> actuators) {
 		super(name);
@@ -83,6 +90,9 @@ public class Controller extends SimEntity {
 		send(getId(), Config.MAX_SIMULATION_TIME, FogEvents.STOP_SIMULATION);
 		for (FogDevice dev : getFogDevices())
 			sendNow(dev.getId(), FogEvents.RESOURCE_MGMT);
+		
+		// Start TF-PPO Sync loop every 10ms
+		send(getId(), 10.0, FogEvents.TF_PPO_SYNC);
 	}
 
 	@Override
@@ -94,29 +104,49 @@ public class Controller extends SimEntity {
 		} else if (_tag_ == FogEvents.TUPLE_FINISHED) {
 			processTupleFinished(ev);
 
+		} else if (_tag_ == FogEvents.TF_PPO_SYNC) {
+			processTFPpoSync();
+
 		} else if (_tag_ == FogEvents.CONTROLLER_RESOURCE_MANAGE) {
 			manageResources();
 
 		} else if (_tag_ == FogEvents.STOP_SIMULATION) {
 			CloudSim.stopSimulation();
-			printTimeDetails();
-			printPowerDetails();
-			printCostDetails();
-			printNetworkUsageDetails();
-			System.exit(0);
+			// printTimeDetails();
+			// printPowerDetails();
+			// printCostDetails();
+			// printNetworkUsageDetails();
+			// printComputationLoadVariance();
+			// System.exit(0); // Removing this so control returns to FANETSimulation.java
 
 		} else if (_tag_ == FogEvents.TUPLE_ARRIVAL) {
 			Tuple tuple = (Tuple) ev.getData();
 			taskWaitingPool.add(tuple);
-			if (taskWaitingPool.size() >= 20) {
-				System.out.println("--- Batch of 20 tasks reached! Running MOGS Matching ---");
-				runFanetMOGSScheduling();
+			if (taskWaitingPool.size() >= 100) {
+				System.out.println("--- Batch of 100 tasks reached! Running Task Scheduling ---");
+				runTaskScheduling();
 			}
 
 		} else {
 			// ignore unexpected events
 		}
 
+	}
+	
+	private void processTFPpoSync() {
+		java.util.List<FogDevice> uavs = new java.util.ArrayList<>();
+		java.util.List<FogDevice> mds = new java.util.ArrayList<>();
+		for (FogDevice device : getFogDevices()) {
+			if (device.getName().startsWith("uav")) {
+				uavs.add(device);
+			} else if (device.getName().startsWith("ground_device_")) {
+				mds.add(device);
+			}
+		}
+		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
+		
+		// Schedule next sync in 10ms
+		send(getId(), 10.0, FogEvents.TF_PPO_SYNC);
 	}
 
 	private void printNetworkUsageDetails() {
@@ -172,6 +202,79 @@ public class Controller extends SimEntity {
 			System.out.println(
 					tupleType + " ---> " + TimeKeeper.getInstance().getTupleTypeToAverageCpuTime().get(tupleType));
 		}
+		System.out.println("=========================================");
+	}
+
+	/**
+	 * Metric 5 – Computation Load Variance
+	 *
+	 * Computes the continuous-time variance of CPU utilization across all UAV and
+	 * terrestrial edge server nodes (i.e., every FogDevice that is not the cloud).
+	 *
+	 * Variance = E[U^2] - (E[U])^2 (population variance over all samples)
+	 *
+	 * Each sample represents the CPU utilization fraction [0,1] at one
+	 * RESOURCE_MGMT_INTERVAL tick. All samples from all edge devices are pooled
+	 * together so the result reflects the global load-balancing spread.
+	 */
+	private void printComputationLoadVariance() {
+		System.out.println("=========================================");
+		System.out.println("COMPUTATION LOAD VARIANCE (Metric 5)");
+		System.out.println("=========================================");
+
+		// Collect utilization samples from all edge devices (UAVs + terrestrial edge).
+		// The cloud node is excluded because we only want to measure the edge layer.
+		List<Double> allSamples = new java.util.ArrayList<>();
+		for (FogDevice dev : getFogDevices()) {
+			if (dev.getName().toLowerCase().equals("cloud"))
+				continue;
+			allSamples.addAll(dev.utilizationSamples);
+		}
+
+		if (allSamples.isEmpty()) {
+			System.out.println("No utilization samples collected – variance cannot be computed.");
+			System.out.println("=========================================");
+			return;
+		}
+
+		// --- Two-pass variance: E[U] then E[(U - mean)^2] ---
+		double sum = 0.0;
+		for (double u : allSamples)
+			sum += u;
+		double mean = sum / allSamples.size();
+
+		double sq = 0.0;
+		for (double u : allSamples)
+			sq += (u - mean) * (u - mean);
+		double variance = sq / allSamples.size();
+		double stddev = Math.sqrt(variance);
+
+		// Per-device breakdown (mean & variance per device)
+		for (FogDevice dev : getFogDevices()) {
+			if (dev.getName().toLowerCase().equals("cloud"))
+				continue;
+			List<Double> s = dev.utilizationSamples;
+			if (s.isEmpty()) {
+				System.out.printf("  %-22s | samples: 0%n", dev.getName());
+				continue;
+			}
+			double dSum = 0.0;
+			for (double u : s)
+				dSum += u;
+			double dMean = dSum / s.size();
+			double dSq = 0.0;
+			for (double u : s)
+				dSq += (u - dMean) * (u - dMean);
+			double dVar = dSq / s.size();
+			System.out.printf("  %-22s | samples: %4d | mean util: %.4f | variance: %.6f%n",
+					dev.getName(), s.size(), dMean, dVar);
+		}
+
+		System.out.println("-----------------------------------------");
+		System.out.printf("  Total samples       : %d%n", allSamples.size());
+		System.out.printf("  Global mean util    : %.4f  (%.2f%%)%n", mean, mean * 100);
+		System.out.printf("  Global variance     : %.6f%n", variance);
+		System.out.printf("  Global std-dev      : %.6f%n", stddev);
 		System.out.println("=========================================");
 	}
 
@@ -235,39 +338,48 @@ public class Controller extends SimEntity {
 		}
 	}
 
-	public void runFanetMOGSScheduling() {
+	public void runTaskScheduling() {
 		if (taskWaitingPool.isEmpty())
 			return;
 
-		// 1. Identify all FogDevices acting as UAVs
+		// 1. Identify all FogDevices acting as UAVs and MDs
 		java.util.List<FogDevice> uavs = new java.util.ArrayList<>();
+		java.util.List<FogDevice> mds = new java.util.ArrayList<>();
 		for (FogDevice device : getFogDevices()) {
 			if (device.getName().startsWith("uav")) {
 				uavs.add(device);
+			} else if (device.getName().startsWith("ground_device")) {
+				mds.add(device);
 			}
 		}
 
-		// 2. Build Preferences via PPO + utility math
-		org.fog.fanet.PreferenceBuilder.buildPreferences(taskWaitingPool, uavs);
-
-		// 3. Run MOGS Matching
-		org.fog.fanet.MOGSMatching.runMatching(taskWaitingPool, uavs);
-
-		// 4. Update persistent queue tracker with real assigned task counts
-		for (FogDevice uav : uavs) {
-			this.uavQueueTracker.put(uav.getName(), uav.acceptedTasks.size());
+		// 3. Local Java Task Scheduling
+		long startNs = System.nanoTime();
+		if (taskScheduler != null) {
+			taskScheduler.scheduleTasks(taskWaitingPool, uavs);
+		} else {
+			System.out.println("WARNING: No TaskScheduler configured in Controller!");
 		}
+		long endNs = System.nanoTime();
+		this.totalSchedulingTimeNs += (endNs - startNs);
+		this.schedulingInvocations++;
 
-		// 5. Physically route the Tuples
+		// 4. Physically route the Tuples
+		int scheduledInBatch = 0;
+		int droppedInBatch = 0;
 		for (Tuple task : taskWaitingPool) {
 			if (task.assignedUavId != null) {
 				sendNow(task.assignedUavId, FogEvents.TUPLE_ARRIVAL, task);
+				scheduledInBatch++;
 			} else {
-				sendNow(getCloudId(), FogEvents.TUPLE_ARRIVAL, task);
+				// System.out.println("Task " + task.getCloudletId() + " dropped (No UAVs in range or swamped)");
+				droppedInBatch++;
 			}
 		}
+		this.systemTotalScheduled += scheduledInBatch;
+		this.systemTotalDropped += droppedInBatch;
 
-		// 6. Clear the pool for the next batch
+		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();
 	}
 
@@ -328,5 +440,9 @@ public class Controller extends SimEntity {
 
 	public void setAppModulePlacementPolicy(Map<String, ModulePlacement> appModulePlacementPolicy) {
 		this.appModulePlacementPolicy = appModulePlacementPolicy;
+	}
+
+	public void setTaskScheduler(TaskScheduler taskScheduler) {
+		this.taskScheduler = taskScheduler;
 	}
 }
