@@ -6,18 +6,15 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.List;
 import org.fog.entities.FogDevice;
-import org.cloudbus.cloudsim.core.CloudSim;
 
-public class PreferenceBuilder {
+public class PPOTrajectoryModel implements TrajectoryModel {
 
-    private static Socket socket;
-    private static PrintWriter out;
-    private static BufferedReader in;
-    
-    // Reward accumulated since last step
-    public static double accumulatedThroughput = 0.0;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
 
-    public static void connectToPPO() {
+    @Override
+    public void start() {
         try {
             System.out.println("Attempting to connect to Python TF-PPO Server on port 5500...");
             socket = new Socket("127.0.0.1", 5500);
@@ -29,9 +26,10 @@ public class PreferenceBuilder {
         }
     }
 
-    public static void disconnectFromPPO() {
+    @Override
+    public void stop() {
         try {
-            if (out != null) out.println("CLOSE\n"); 
+            if (out != null) out.println("CLOSE\n");
             if (socket != null) socket.close();
             System.out.println("Disconnected from Python PPO Server.");
         } catch (Exception e) {
@@ -39,7 +37,8 @@ public class PreferenceBuilder {
         }
     }
 
-    public static void updateTrajectories(List<FogDevice> uavs, List<FogDevice> mds) {
+    @Override
+    public void updateTrajectories(List<FogDevice> uavs, List<FogDevice> mds) {
         if (out == null || in == null) {
             System.out.println("No connection to Python. Skipping trajectory update...");
             return;
@@ -77,11 +76,11 @@ public class PreferenceBuilder {
 
             String jsonRequest = String.format(
                 "{\"reward\": %f, \"uavs\": %s}",
-                accumulatedThroughput, uavJsonBuilder.toString()
+                GlobalState.accumulatedThroughput, uavJsonBuilder.toString()
             );
 
             // Reset reward for next step
-            accumulatedThroughput = 0.0;
+            GlobalState.accumulatedThroughput = 0.0;
 
             out.println(jsonRequest);
             String response = in.readLine();
@@ -113,7 +112,7 @@ public class PreferenceBuilder {
         }
     }
     
-    private static String extractJsonString(String json, String key) {
+    private String extractJsonString(String json, String key) {
         String search = "\"" + key + "\": \"";
         int start = json.indexOf(search);
         if (start == -1) return "";
@@ -122,7 +121,7 @@ public class PreferenceBuilder {
         return json.substring(start, end);
     }
     
-    private static double extractJsonDouble(String json, String key) {
+    private double extractJsonDouble(String json, String key) {
         String search = "\"" + key + "\": ";
         int start = json.indexOf(search);
         if (start == -1) return 0.0;

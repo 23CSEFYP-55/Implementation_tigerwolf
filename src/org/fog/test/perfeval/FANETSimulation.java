@@ -47,8 +47,8 @@ public class FANETSimulation {
     static Controller masterController;
 
     // Application, UAV count, and HARD LIMITS
-    static int numUAVs = 12;
-    static int NUM_MDS = 800; // 800 MDs
+    static int numUAVs = 30;
+    static int NUM_MDS = 100; // 100 MDs
     static double SENSOR_TRANSMISSION_TIME = 1000.0; // Mean time (lambda) for Poisson
 
     // --- NEW: Time Limit ---
@@ -75,8 +75,8 @@ public class FANETSimulation {
             Application application = createApplication(appId, broker.getId());
             application.setUserId(broker.getId());
 
-            // Dynamic UAV count between 2 and 12
-            numUAVs = 12;
+            // Dynamic UAV count between 2 and 30
+            numUAVs = 30;
             System.out.println("Dynamically spawning " + numUAVs + " UAVs...");
 
             Log.disable(); // Directive 1: Silence Default Logging (Noise Reduction)
@@ -88,8 +88,14 @@ public class FANETSimulation {
             masterController = new Controller("master-controller", fogDevices, sensors, actuators);
             if (schedulerType.equalsIgnoreCase("MOGS")) {
                 masterController.setTaskScheduler(new org.fog.fanet.MOGSScheduler());
+            } else if (schedulerType.equalsIgnoreCase("LEXICOGRAPHIC")) {
+                masterController.setTaskScheduler(new org.fog.fanet.LexicographicScheduler());
+            } else if (schedulerType.equalsIgnoreCase("BIDDING")) {
+                masterController.setTaskScheduler(new org.fog.fanet.BiddingScheduler());
+            } else if (schedulerType.equalsIgnoreCase("MARL")) {
+                masterController.setTaskScheduler(new org.fog.fanet.MARLScheduler());
             } else {
-                masterController.setTaskScheduler(new DynamicRepairScheduler());
+                masterController.setTaskScheduler(new org.fog.fanet.DynamicRepairScheduler());
             }
 
             // 5. Set the module placement policy (EdgeWards = prefer edge/UAV nodes)
@@ -103,8 +109,12 @@ public class FANETSimulation {
             // 6. Record simulation start time and run
             TimeKeeper.getInstance().setSimulationStartTime(Calendar.getInstance().getTimeInMillis());
 
-            // Connect to the Python AI Server
-            org.fog.fanet.PreferenceBuilder.connectToPPO();
+            // Connect to the Trajectory AI Server
+            org.fog.fanet.TrajectoryModel trajectoryModel = new org.fog.fanet.PPOTrajectoryModel();
+            trajectoryModel.start();
+            masterController.setTrajectoryModel(trajectoryModel);
+
+            org.fog.fanet.MarlClient.connect();
 
             // Enforce simulation time
             System.out.println("Scheduling simulation termination at " + MAX_SIM_TIME + " ms.");
@@ -115,13 +125,15 @@ public class FANETSimulation {
             CloudSim.stopSimulation();
 
             // --- CRITICAL STEP FOR SHUTDOWN ---
-            org.fog.fanet.PreferenceBuilder.disconnectFromPPO();
+            trajectoryModel.stop();
+            org.fog.fanet.MarlClient.disconnect();
 
             Log.enable(); // Re-enable logging for the final dashboard
 
             // Directive 3: Generate the Final Benchmark Dashboard
             printUAVBenchmarks();
             printSchedulingMetrics();
+            printMogsBenchDashboard();
 
             System.out.println("========== FANET Simulation Finished ==========");
 
@@ -156,6 +168,59 @@ public class FANETSimulation {
         System.out.println(String.format("Average Scheduling Overhead      : %.4f ms per batch", avgOverheadMs));
         System.out.println(String.format("System Total Offloaded Tasks     : %d", totalOffloaded));
         System.out.println("===================================================\n");
+    }
+
+    private static void printMogsBenchDashboard() {
+        if (masterController == null) return;
+        
+        long invocations = masterController.schedulingInvocations;
+        if (invocations == 0) invocations = 1; // Avoid division by zero
+        
+        long totalCompleted = 0;
+        for (FogDevice device : fogDevices) {
+            if (device.getName().startsWith("uav")) {
+                totalCompleted += device.completedTasks;
+            }
+        }
+        
+        long totalFailed = masterController.systemTotalDropped;
+        long totalGenerated = masterController.totalGeneratedTasks;
+        long totalUnassigned = masterController.totalUnassignedTasks;
+        
+        double avgThroughput = totalGenerated > 0 ? (double) totalCompleted / totalGenerated : 0.0;
+        double avgRuntimeSec = (masterController.totalSchedulingTimeNs / (double) invocations) / 1_000_000_000.0;
+        double avgUavUtil = masterController.totalUAVUtilization / invocations;
+        double avgCapUtil = masterController.totalCapacityUtilization / invocations;
+        
+        System.out.println("\n               UAV Task Scheduling Benchmark Results               ");
+        System.out.println("╭──────────────────────────┬─────────────────────╮");
+        System.out.println("│ Metric                   │ Value               │");
+        System.out.println("├──────────────────────────┼─────────────────────┤");
+        System.out.println(String.format("│ Average Throughput       │ %-19.4f │", avgThroughput));
+        System.out.println(String.format("│ Average Runtime (sec)    │ %-19.6f │", avgRuntimeSec));
+        System.out.println(String.format("│ Average UAV Utilization  │ %-19.4f │", avgUavUtil));
+        System.out.println(String.format("│ Average Capacity Util    │ %-19.4f │", avgCapUtil));
+        System.out.println(String.format("│ Average Completed Tasks  │ %-19.2f │", (double) totalCompleted / invocations));
+        System.out.println(String.format("│ Average Failed Tasks     │ %-19.2f │", (double) totalFailed / invocations));
+        System.out.println(String.format("│ Average Unassigned Tasks │ %-19.2f │", (double) totalUnassigned / invocations));
+        
+        // Extract TaskScheduler to print Dynamic Repair specific metrics
+        try {
+            java.lang.reflect.Field field = org.fog.placement.Controller.class.getDeclaredField("taskScheduler");
+            field.setAccessible(true);
+            Object scheduler = field.get(masterController);
+            if (scheduler instanceof org.fog.fanet.DynamicRepairScheduler) {
+                org.fog.fanet.DynamicRepairScheduler drs = (org.fog.fanet.DynamicRepairScheduler) scheduler;
+                long drsCycles = drs.getSchedulingCycles() > 0 ? drs.getSchedulingCycles() : 1;
+                System.out.println(String.format("│ Average Repair Queue     │ %-19.2f │", (double) drs.getTotalRepairQueueLength() / drsCycles));
+                System.out.println(String.format("│ Average Invalid Assigns  │ %-19.2f │", (double) drs.getTotalInvalidAssignments() / drsCycles));
+                System.out.println(String.format("│ Average Reassigned Tasks │ %-19.2f │", (double) drs.getTotalReassignedTasks() / drsCycles));
+            }
+        } catch (Exception e) {
+            // Ignore reflection errors if any
+        }
+        
+        System.out.println("╰──────────────────────────┴─────────────────────╯\n");
     }
 
     private static void printUAVBenchmarks() {

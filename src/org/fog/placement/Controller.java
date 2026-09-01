@@ -45,6 +45,12 @@ public class Controller extends SimEntity {
 	public long totalSchedulingTimeNs = 0;
 	public long schedulingInvocations = 0;
 
+	// Metrics Tracking
+	public double totalUAVUtilization = 0;
+	public double totalCapacityUtilization = 0;
+	public long totalUnassignedTasks = 0;
+	public long totalGeneratedTasks = 0;
+
 	public Controller(String name, List<FogDevice> fogDevices, List<Sensor> sensors, List<Actuator> actuators) {
 		super(name);
 		this.applications = new HashMap<String, Application>();
@@ -133,6 +139,12 @@ public class Controller extends SimEntity {
 
 	}
 	
+	private org.fog.fanet.TrajectoryModel trajectoryModel;
+
+	public void setTrajectoryModel(org.fog.fanet.TrajectoryModel trajectoryModel) {
+		this.trajectoryModel = trajectoryModel;
+	}
+
 	private void processTFPpoSync() {
 		java.util.List<FogDevice> uavs = new java.util.ArrayList<>();
 		java.util.List<FogDevice> mds = new java.util.ArrayList<>();
@@ -143,7 +155,10 @@ public class Controller extends SimEntity {
 				mds.add(device);
 			}
 		}
-		org.fog.fanet.PreferenceBuilder.updateTrajectories(uavs, mds);
+		
+		if (this.trajectoryModel != null) {
+			this.trajectoryModel.updateTrajectories(uavs, mds);
+		}
 		
 		// Schedule next sync in 10ms
 		send(getId(), 10.0, FogEvents.TF_PPO_SYNC);
@@ -378,6 +393,36 @@ public class Controller extends SimEntity {
 		}
 		this.systemTotalScheduled += scheduledInBatch;
 		this.systemTotalDropped += droppedInBatch;
+		this.totalUnassignedTasks += droppedInBatch;
+		this.totalGeneratedTasks += taskWaitingPool.size();
+
+		// Calculate Utilizations for this batch
+		double activeCount = 0;
+		double capUtilSum = 0;
+		if (!uavs.isEmpty()) {
+			for (FogDevice uav : uavs) {
+				if (uav.acceptedTasks.size() > 0) activeCount++;
+				capUtilSum += (double) uav.acceptedTasks.size() / (double) uav.taskCapacity;
+			}
+			this.totalUAVUtilization += (activeCount / uavs.size());
+			this.totalCapacityUtilization += (capUtilSum / uavs.size());
+		}
+
+		// Output time-series metrics for graphing system
+		double currentRuntimeMs = (endNs - startNs) / 1000000.0;
+		double currentUavUtil = uavs.isEmpty() ? 0 : (activeCount / uavs.size());
+		double currentCapUtil = uavs.isEmpty() ? 0 : (capUtilSum / uavs.size());
+		
+		long rqLen = 0, inv = 0, re = 0;
+		if (taskScheduler instanceof org.fog.fanet.DynamicRepairScheduler) {
+			org.fog.fanet.DynamicRepairScheduler drs = (org.fog.fanet.DynamicRepairScheduler) taskScheduler;
+			rqLen = drs.getTotalRepairQueueLength(); // Cumulative, but can be plotted
+			inv = drs.getTotalInvalidAssignments();
+			re = drs.getTotalReassignedTasks();
+		}
+
+		System.out.println(String.format("[METRIC_EPOCH] Epoch:%d, Generated:%d, Scheduled:%d, Dropped:%d, RuntimeMs:%.4f, UavUtil:%.4f, CapUtil:%.4f, RepairQ:%d, Invalid:%d, Reassigned:%d",
+				schedulingInvocations, taskWaitingPool.size(), scheduledInBatch, droppedInBatch, currentRuntimeMs, currentUavUtil, currentCapUtil, rqLen, inv, re));
 
 		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();

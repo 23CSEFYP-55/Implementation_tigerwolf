@@ -62,7 +62,7 @@ public class MOGSScheduler implements TaskScheduler {
             // High/Low load state check
             if (targetUav.acceptedTasks.size() < targetUav.taskCapacity && checkLatencyConstraint(targetUav, task)) {
                 targetUav.acceptedTasks.add(task);
-                PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                GlobalState.accumulatedThroughput += task.tupleDataSize;
             } else {
                 // P2P Offloading logic: Try to offload to a low-load peer
                 boolean offloaded = false;
@@ -76,7 +76,7 @@ public class MOGSScheduler implements TaskScheduler {
                             if (distToPeer < 500.0) {
                                 peer.acceptedTasks.add(task);
                                 task.assignedUavId = peer.getId();
-                                PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                                GlobalState.accumulatedThroughput += task.tupleDataSize;
                                 targetUav.tasksOffloaded++; // Increment offloaded count
                                 offloaded = true;
                                 break;

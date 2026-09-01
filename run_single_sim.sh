@@ -3,10 +3,14 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
 PYTHON_SERVER="$PROJECT_DIR/ppo_agent/tf_ppo_server.py"
+MARL_SERVER="$PROJECT_DIR/ppo_agent/marl_allocation_server.py"
 
 cleanup() {
     if [ -n "$PYTHON_PID" ]; then
         kill "$PYTHON_PID" 2>/dev/null || true
+    fi
+    if [ -n "$MARL_PID" ]; then
+        kill "$MARL_PID" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT
@@ -17,8 +21,11 @@ cd "$PROJECT_DIR/ppo_agent"
 $PYTHON_CMD "$PYTHON_SERVER" > /dev/null 2>&1 &
 PYTHON_PID=$!
 
+$PYTHON_CMD "$MARL_SERVER" > /dev/null 2>&1 &
+MARL_PID=$!
+
 for i in {1..20}; do
-    if nc -z localhost 5500 2>/dev/null; then
+    if nc -z localhost 5500 2>/dev/null && nc -z localhost 5501 2>/dev/null; then
         break
     fi
     sleep 0.5
