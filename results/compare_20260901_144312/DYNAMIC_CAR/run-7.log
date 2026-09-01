@@ -1,0 +1,79 @@
+========== Starting FANET Simulation with DYNAMIC Scheduler / CAR Trajectory ==========
+Initialising...
+Dynamically spawning 30 UAVs...
+Attempting to connect to CAR Pointer-Network Server on port 5510...
+FAILED: Could not connect to CAR Pointer-Network Server.
+Attempting to connect to MARL Allocation Server on port 5501...
+FAILED: Could not connect to MARL Allocation Server.
+Scheduling simulation termination at 5000.0 ms.
+0.0 Submitted application fanet_app
+[METRIC_EPOCH] Epoch:1, Generated:100, Scheduled:17, Dropped:83, RuntimeMs:2.9258, UavUtil:0.2333, CapUtil:0.0038, RepairQ:100, Invalid:0, Reassigned:0
+[METRIC_EPOCH] Epoch:2, Generated:100, Scheduled:16, Dropped:84, RuntimeMs:1.2838, UavUtil:0.4000, CapUtil:0.0073, RepairQ:200, Invalid:0, Reassigned:0
+[METRIC_EPOCH] Epoch:3, Generated:100, Scheduled:15, Dropped:85, RuntimeMs:1.2812, UavUtil:0.4000, CapUtil:0.0107, RepairQ:300, Invalid:0, Reassigned:0
+[METRIC_EPOCH] Epoch:4, Generated:100, Scheduled:19, Dropped:81, RuntimeMs:1.1275, UavUtil:0.4667, CapUtil:0.0149, RepairQ:400, Invalid:0, Reassigned:0
+Disconnected from CAR Pointer-Network Server.
+Disconnected from MARL Allocation Server.
+
+========== FINAL UAV BENCHMARK DASHBOARD ==========
+UAV ID          | Tasks Completed | Data Processed (MB)  | Avg Latency (ms) | Energy Consumed (J) | Tasks Offloaded
+----------------------------------------------------------------------------------------------------------------------
+uav_0           | 0               | 0.0000               | 0.00             | 485337.8002         | 0              
+uav_1           | 0               | 0.0000               | 0.00             | 441361.4839         | 0              
+uav_2           | 0               | 0.0000               | 0.00             | 435445.4268         | 0              
+uav_3           | 0               | 0.0000               | 0.00             | 431349.6950         | 0              
+uav_4           | 0               | 0.0000               | 0.00             | 428346.1583         | 0              
+uav_5           | 0               | 0.0000               | 0.00             | 426049.3362         | 0              
+uav_6           | 19              | 9.0599               | 536.36           | 423839.0670         | 0              
+uav_7           | 0               | 0.0000               | 0.00             | 470292.1337         | 0              
+uav_8           | 17              | 8.1062               | 679.14           | 443722.3946         | 0              
+uav_9           | 0               | 0.0000               | 0.00             | 420536.9630         | 0              
+uav_10          | 0               | 0.0000               | 0.00             | 419669.2746         | 0              
+uav_11          | 0               | 0.0000               | 0.00             | 418921.2674         | 0              
+uav_12          | 16              | 7.6294               | 605.71           | 436879.6189         | 0              
+uav_13          | 0               | 0.0000               | 0.00             | 417697.2556         | 0              
+uav_14          | 0               | 0.0000               | 0.00             | 467283.0004         | 0              
+uav_15          | 0               | 0.0000               | 0.00             | 490082.7180         | 0              
+uav_16          | 0               | 0.0000               | 0.00             | 416332.0117         | 0              
+uav_17          | 15              | 7.1526               | 504.26           | 436385.1944         | 0              
+uav_18          | 0               | 0.0000               | 0.00             | 415633.5148         | 0              
+uav_19          | 0               | 0.0000               | 0.00             | 489620.5166         | 0              
+uav_20          | 0               | 0.0000               | 0.00             | 419635.2593         | 0              
+uav_21          | 0               | 0.0000               | 0.00             | 489446.0120         | 0              
+uav_22          | 0               | 0.0000               | 0.00             | 465866.9376         | 0              
+uav_23          | 0               | 0.0000               | 0.00             | 414348.5441         | 0              
+uav_24          | 0               | 0.0000               | 0.00             | 414147.6214         | 0              
+uav_25          | 0               | 0.0000               | 0.00             | 489170.4784         | 0              
+uav_26          | 0               | 0.0000               | 0.00             | 489113.2702         | 0              
+uav_27          | 0               | 0.0000               | 0.00             | 413623.9048         | 0              
+uav_28          | 0               | 0.0000               | 0.00             | 413471.5006         | 0              
+uav_29          | 0               | 0.0000               | 0.00             | 413328.4750         | 0              
+----------------------------------------------------------------------------------------------------------------------
+System Total Tasks Completed: 67  |  System Total Throughput: 31.9481 MB  |  Average System Latency: 581.96 ms
+===================================================
+
+========== SCHEDULING ALGORITHM METRICS ==========
+Total Tasks Successfully Scheduled : 67
+Total Tasks Dropped              : 333
+Scheduling Success Rate          : 16.75%
+Average Scheduling Overhead      : 1.6546 ms per batch
+System Total Offloaded Tasks     : 0
+===================================================
+
+
+               UAV Task Scheduling Benchmark Results               
+╭──────────────────────────┬─────────────────────╮
+│ Metric                   │ Value               │
+├──────────────────────────┼─────────────────────┤
+│ Average Throughput       │ 0.1675              │
+│ Average Runtime (sec)    │ 0.001655            │
+│ Average UAV Utilization  │ 0.3750              │
+│ Average Capacity Util    │ 0.0092              │
+│ Average Completed Tasks  │ 16.75               │
+│ Average Failed Tasks     │ 83.25               │
+│ Average Unassigned Tasks │ 83.25               │
+│ Average Repair Queue     │ 100.00              │
+│ Average Invalid Assigns  │ 0.00                │
+│ Average Reassigned Tasks │ 0.00                │
+╰──────────────────────────┴─────────────────────╯
+
+========== FANET Simulation Finished ==========

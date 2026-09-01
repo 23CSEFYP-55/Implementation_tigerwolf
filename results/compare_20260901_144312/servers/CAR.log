@@ -1,0 +1,12 @@
+[CAR-PtrNet] Loaded trained model from /Users/nandagopalmenon/Projects/fyp/Implementation_tigerwolf/ppo_agent/car_ptrnet.pt.
+
+[CAR Server] Listening on localhost:5510
+[CAR Server] Waiting for Java iFogSim to connect...
+
+[CAR Server] Connected to ('127.0.0.1', 61583)
+[CAR Server] Connected to ('127.0.0.1', 61611)
+[CAR Server] Simulation ended.
+[CAR Server] Connected to ('127.0.0.1', 61613)
+[CAR Server] Simulation ended.
+[CAR Server] Connected to ('127.0.0.1', 61616)
+[CAR Server] Simulation ended.

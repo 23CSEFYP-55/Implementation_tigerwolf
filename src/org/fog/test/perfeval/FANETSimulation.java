@@ -60,7 +60,13 @@ public class FANETSimulation {
             schedulerType = args[0];
         }
         
-        Log.printLine("========== Starting FANET Simulation with " + schedulerType + " Scheduler ==========");
+        String trajectoryType = "PPO"; // Default
+        if (args.length > 1) {
+            trajectoryType = args[1];
+        }
+        
+        Log.printLine("========== Starting FANET Simulation with " + schedulerType
+                + " Scheduler / " + trajectoryType + " Trajectory ==========");
 
         try {
             // 1. Initialize CloudSim
@@ -110,7 +116,12 @@ public class FANETSimulation {
             TimeKeeper.getInstance().setSimulationStartTime(Calendar.getInstance().getTimeInMillis());
 
             // Connect to the Trajectory AI Server
-            org.fog.fanet.TrajectoryModel trajectoryModel = new org.fog.fanet.PPOTrajectoryModel();
+            org.fog.fanet.TrajectoryModel trajectoryModel;
+            if (trajectoryType.equalsIgnoreCase("CAR")) {
+                trajectoryModel = new org.fog.fanet.CarTrajectoryModel();
+            } else {
+                trajectoryModel = new org.fog.fanet.PPOTrajectoryModel();
+            }
             trajectoryModel.start();
             masterController.setTrajectoryModel(trajectoryModel);
 
