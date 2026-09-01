@@ -1,5 +1,0 @@
-combo,run,Tasks Completed,Throughput (MB),Avg Latency (ms),Tasks Dropped,Success Rate (%),Sched Overhead (ms),P2P Offloads,Average Throughput-Thr,UAV Utilization,Capacity Utilization,Unassigned Tasks,Repair Queue Len,Invalid Assigns,Reassigned Tasks
-MOGS/PPO,1,36.0,17.1661,575.0,364.0,9.0,1.3796,0.0,0.09,0.275,0.0052,91.0,,,
-MOGS/CAR,1,153.0,72.9561,498.58,247.0,38.25,2.6671,2.0,0.3825,0.8583,0.0214,61.75,,,
-DYNAMIC/PPO,1,52.0,24.7955,487.06,348.0,13.0,1.0447,1.0,0.13,0.225,0.0062,87.0,100.0,0.0,0.0
-DYNAMIC/CAR,1,163.0,77.7245,523.32,237.0,40.75,1.2259,1.0,0.4075,0.8583,0.0214,59.25,100.0,0.0,0.0

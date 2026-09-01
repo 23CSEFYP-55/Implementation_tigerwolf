@@ -1,3 +1,0 @@
-combo,run,Tasks Completed,Throughput (MB),Avg Latency (ms),Tasks Dropped,Success Rate (%),Sched Overhead (ms),P2P Offloads,Average Throughput-Thr,UAV Utilization,Capacity Utilization,Unassigned Tasks,Repair Queue Len,Invalid Assigns,Reassigned Tasks
-MOGS/CAR,1,184.0,87.738,529.05,216.0,46.0,4.7249,6.0,0.46,0.8833,0.0249,54.0,,,
-BIDDING/CAR,1,163.0,77.7245,523.12,237.0,40.75,145.4176,0.0,0.4075,0.925,0.0224,59.25,,,
