@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 from rich.console import Console
 from rich.progress import track
 
+import os
+import sys
+
 console = Console()
-NUM_RUNS = 3 # Adjust for smoother graphs, takes longer
+NUM_RUNS = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else int(os.environ.get("NUM_RUNS", "1"))
 
 SCHEDULERS = {
     "MOGS": "magenta",
@@ -19,14 +22,17 @@ SCHEDULERS = {
 def parse_epoch_metrics(output):
     """Parses [METRIC_EPOCH] lines from simulation output."""
     epochs = []
-    # e.g. [METRIC_EPOCH] Epoch:1, Generated:100, Scheduled:20, Dropped:80, RuntimeMs:1.5000, UavUtil:0.2, CapUtil:0.05, RepairQ:0, Invalid:0, Reassigned:0
-    pattern = r"\[METRIC_EPOCH\] Epoch:\d+, Generated:(\d+), Scheduled:(\d+), Dropped:\d+, RuntimeMs:([\d.]+), UavUtil:([\d.]+), CapUtil:([\d.]+), RepairQ:(\d+), Invalid:(\d+), Reassigned:(\d+)"
+    # e.g. [METRIC_EPOCH] Epoch:1, Generated:100, Scheduled:20, Dropped:80, RuntimeMs:1.5000, UavUtil:0.2, CapUtil:0.05, RepairQ:0, Invalid:0, Reassigned:0, Fairness:0.9500, Churn:0.0000, Slack:0.4200
+    pattern = r"\[METRIC_EPOCH\] Epoch:\d+, Generated:(\d+), Scheduled:(\d+), Dropped:\d+, RuntimeMs:([\d.]+), UavUtil:([\d.]+), CapUtil:([\d.]+), RepairQ:(\d+), Invalid:(\d+), Reassigned:(\d+)(?:, Fairness:([\d.]+), Churn:([\d.]+), Slack:([\d.]+))?"
     for line in output.split('\n'):
         match = re.search(pattern, line)
         if match:
             generated = max(1, int(match.group(1)))
             scheduled = int(match.group(2))
             throughput = scheduled / generated
+            fairness = float(match.group(9)) if match.group(9) is not None else 1.0
+            churn = float(match.group(10)) if match.group(10) is not None else 0.0
+            slack = float(match.group(11)) if match.group(11) is not None else 0.0
             epochs.append({
                 'throughput': throughput,
                 'runtime': float(match.group(3)),
@@ -35,7 +41,10 @@ def parse_epoch_metrics(output):
                 'queue': float(match.group(1)) - scheduled,
                 'repair_queue': float(match.group(6)),
                 'invalid': float(match.group(7)),
-                'reassigned': float(match.group(8))
+                'reassigned': float(match.group(8)),
+                'fairness': fairness,
+                'churn': churn,
+                'slack': slack
             })
     return epochs
 
@@ -70,7 +79,10 @@ def generate_graphs():
             'queue': np.mean([[e['queue'] for e in run] for run in truncated_runs], axis=0),
             'repair_queue': np.mean([[e['repair_queue'] for e in run] for run in truncated_runs], axis=0),
             'invalid': np.mean([[e['invalid'] for e in run] for run in truncated_runs], axis=0),
-            'reassigned': np.mean([[e['reassigned'] for e in run] for run in truncated_runs], axis=0)
+            'reassigned': np.mean([[e['reassigned'] for e in run] for run in truncated_runs], axis=0),
+            'fairness': np.mean([[e['fairness'] for e in run] for run in truncated_runs], axis=0),
+            'churn': np.mean([[e['churn'] for e in run] for run in truncated_runs], axis=0),
+            'slack': np.mean([[e['slack'] for e in run] for run in truncated_runs], axis=0)
         }
 
     metrics_to_plot = [
@@ -80,6 +92,9 @@ def generate_graphs():
         ("cap_util", "Capacity Utilization", "Average Capacity Utilization Over Time", "capacity_utilization_comparison.png", True),
         ("queue", "Unassigned Tasks (Queue Length)", "Average Queue Length Over Time", "queue_length_comparison.png", True),
         ("repair_queue", "Repair Queue Length", "Average Repair Queue Over Time", "repair_queue_comparison.png", False),
+        ("fairness", "Jain's Fairness Index", "Swarm Workload Balance Over Time (Jain's Index)", "fairness_comparison.png", True),
+        ("churn", "Allocation Churn Rate", "Task Allocation Churn Rate Over Time", "churn_comparison.png", True),
+        ("slack", "Deadline Slack Margin", "Average Deadline Slack Margin Over Time", "slack_margin_comparison.png", True),
     ]
 
     for key, ylabel, title, filename, include_all in metrics_to_plot:

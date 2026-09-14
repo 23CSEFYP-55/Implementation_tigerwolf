@@ -50,6 +50,10 @@ public class Controller extends SimEntity {
 	public double totalCapacityUtilization = 0;
 	public long totalUnassignedTasks = 0;
 	public long totalGeneratedTasks = 0;
+	public double totalJainsFairness = 0;
+	public double totalAllocationChurn = 0;
+	public double totalDeadlineSlack = 0;
+	private Map<Integer, Integer> lastMdAssignedUav = new HashMap<>();
 
 	public Controller(String name, List<FogDevice> fogDevices, List<Sensor> sensors, List<Actuator> actuators) {
 		super(name);
@@ -396,17 +400,86 @@ public class Controller extends SimEntity {
 		this.totalUnassignedTasks += droppedInBatch;
 		this.totalGeneratedTasks += taskWaitingPool.size();
 
-		// Calculate Utilizations for this batch
+		// Calculate Utilizations and Swarm Workload Balance (Jain's Fairness Index) for this batch
 		double activeCount = 0;
 		double capUtilSum = 0;
+		double sumLoad = 0.0;
+		double sumSqLoad = 0.0;
+		Map<Integer, FogDevice> uavIdMap = new HashMap<>();
 		if (!uavs.isEmpty()) {
 			for (FogDevice uav : uavs) {
+				uavIdMap.put(uav.getId(), uav);
 				if (uav.acceptedTasks.size() > 0) activeCount++;
-				capUtilSum += (double) uav.acceptedTasks.size() / (double) uav.taskCapacity;
+				double load = (uav.taskCapacity > 0) ? ((double) uav.acceptedTasks.size() / (double) uav.taskCapacity) : 0.0;
+				capUtilSum += load;
+				sumLoad += load;
+				sumSqLoad += (load * load);
 			}
 			this.totalUAVUtilization += (activeCount / uavs.size());
 			this.totalCapacityUtilization += (capUtilSum / uavs.size());
 		}
+		double currentFairness = (!uavs.isEmpty() && sumSqLoad > 0)
+				? (sumLoad * sumLoad) / (uavs.size() * sumSqLoad)
+				: 1.0;
+		this.totalJainsFairness += currentFairness;
+
+		// Calculate Allocation Churn Rate and Deadline Slack Margin
+		int churnCount = 0;
+		int evaluatedMds = 0;
+		double batchSlackSum = 0.0;
+		int validSlackCount = 0;
+		double currentDataRate = 6250000.0; // 50 Mbps in bytes/sec
+
+		for (Tuple task : taskWaitingPool) {
+			int mdId = task.getSourceDeviceId();
+			if (mdId >= 0 && lastMdAssignedUav.containsKey(mdId)) {
+				int prevUavId = lastMdAssignedUav.get(mdId);
+				evaluatedMds++;
+				if (task.assignedUavId != null && task.assignedUavId != prevUavId) {
+					FogDevice prevUav = uavIdMap.get(prevUavId);
+					FogDevice md = null;
+					try {
+						md = (FogDevice) org.cloudbus.cloudsim.core.CloudSim.getEntity(mdId);
+					} catch (Exception ignored) {}
+
+					if (prevUav != null && md != null) {
+						double dist = Math.sqrt(Math.pow(prevUav.x_coord - md.x_coord, 2) + Math.pow(prevUav.y_coord - md.y_coord, 2));
+						if (dist <= prevUav.coverageRadius && prevUav.acceptedTasks.size() < prevUav.taskCapacity) {
+							churnCount++;
+						}
+					}
+				}
+			}
+			if (task.assignedUavId != null) {
+				if (mdId >= 0) {
+					lastMdAssignedUav.put(mdId, task.assignedUavId);
+				}
+
+				FogDevice assignedUav = uavIdMap.get(task.assignedUavId);
+				if (assignedUav != null) {
+					double txDelayMs = (task.getCloudletFileSize() / currentDataRate) * 1000.0;
+					double uavMips = assignedUav.getHost().getTotalMips();
+					double totalMiInQueue = 0.0;
+					for (Tuple t : assignedUav.acceptedTasks) {
+						totalMiInQueue += t.getCloudletLength();
+					}
+					double queueDelayMs = (uavMips > 0) ? (totalMiInQueue / uavMips) * 1000.0 : 0.0;
+					double totalDelay = txDelayMs + queueDelayMs;
+
+					if (task.tolerantLatency > 0) {
+						double slack = (task.tolerantLatency - totalDelay) / task.tolerantLatency;
+						slack = Math.max(0.0, Math.min(1.0, slack));
+						batchSlackSum += slack;
+						validSlackCount++;
+					}
+				}
+			}
+		}
+		double currentChurn = (evaluatedMds > 0) ? ((double) churnCount / evaluatedMds) : 0.0;
+		this.totalAllocationChurn += currentChurn;
+
+		double currentSlack = (validSlackCount > 0) ? (batchSlackSum / validSlackCount) : 0.0;
+		this.totalDeadlineSlack += currentSlack;
 
 		// Output time-series metrics for graphing system
 		double currentRuntimeMs = (endNs - startNs) / 1000000.0;
@@ -421,11 +494,16 @@ public class Controller extends SimEntity {
 			re = drs.getTotalReassignedTasks();
 		}
 
-		System.out.println(String.format("[METRIC_EPOCH] Epoch:%d, Generated:%d, Scheduled:%d, Dropped:%d, RuntimeMs:%.4f, UavUtil:%.4f, CapUtil:%.4f, RepairQ:%d, Invalid:%d, Reassigned:%d",
-				schedulingInvocations, taskWaitingPool.size(), scheduledInBatch, droppedInBatch, currentRuntimeMs, currentUavUtil, currentCapUtil, rqLen, inv, re));
+		System.out.println(String.format("[METRIC_EPOCH] Epoch:%d, Generated:%d, Scheduled:%d, Dropped:%d, RuntimeMs:%.4f, UavUtil:%.4f, CapUtil:%.4f, RepairQ:%d, Invalid:%d, Reassigned:%d, Fairness:%.4f, Churn:%.4f, Slack:%.4f",
+				schedulingInvocations, taskWaitingPool.size(), scheduledInBatch, droppedInBatch, currentRuntimeMs, currentUavUtil, currentCapUtil, rqLen, inv, re, currentFairness, currentChurn, currentSlack));
 
 		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();
+
+		int maxEpochs = Integer.parseInt(System.getProperty("sim.epochs", "100"));
+		if (schedulingInvocations >= maxEpochs) {
+			org.cloudbus.cloudsim.core.CloudSim.abruptallyTerminate();
+		}
 	}
 
 	private int getCloudId() {

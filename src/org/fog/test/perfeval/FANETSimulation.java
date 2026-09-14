@@ -51,8 +51,8 @@ public class FANETSimulation {
     static int NUM_MDS = 100; // 100 MDs
     static double SENSOR_TRANSMISSION_TIME = 1000.0; // Mean time (lambda) for Poisson
 
-    // --- NEW: Time Limit ---
-    static double MAX_SIM_TIME = 5000.0;
+    // --- Time Limit (extended to allow 100 epochs) ---
+    static double MAX_SIM_TIME = 150000.0;
 
     public static void main(String[] args) {
         String schedulerType = "DYNAMIC"; // Default
@@ -119,6 +119,8 @@ public class FANETSimulation {
             org.fog.fanet.TrajectoryModel trajectoryModel;
             if (trajectoryType.equalsIgnoreCase("CAR")) {
                 trajectoryModel = new org.fog.fanet.CarTrajectoryModel();
+            } else if (trajectoryType.equalsIgnoreCase("TACC") || trajectoryType.equalsIgnoreCase("TACC_AAV")) {
+                trajectoryModel = new org.fog.fanet.TACCAAVTrajectoryModel();
             } else {
                 trajectoryModel = new org.fog.fanet.PPOTrajectoryModel();
             }
@@ -173,11 +175,24 @@ public class FANETSimulation {
                 ? (masterController.totalSchedulingTimeNs / (double) masterController.schedulingInvocations) / 1_000_000.0 
                 : 0.0;
 
+        double avgFairness = masterController.schedulingInvocations > 0
+                ? masterController.totalJainsFairness / masterController.schedulingInvocations
+                : 1.0;
+        double avgChurn = masterController.schedulingInvocations > 0
+                ? masterController.totalAllocationChurn / masterController.schedulingInvocations
+                : 0.0;
+        double avgSlack = masterController.schedulingInvocations > 0
+                ? masterController.totalDeadlineSlack / masterController.schedulingInvocations
+                : 0.0;
+
         System.out.println(String.format("Total Tasks Successfully Scheduled : %d", scheduled));
         System.out.println(String.format("Total Tasks Dropped              : %d", dropped));
         System.out.println(String.format("Scheduling Success Rate          : %.2f%%", successRate));
         System.out.println(String.format("Average Scheduling Overhead      : %.4f ms per batch", avgOverheadMs));
         System.out.println(String.format("System Total Offloaded Tasks     : %d", totalOffloaded));
+        System.out.println(String.format("Average Jain's Fairness          : %.4f", avgFairness));
+        System.out.println(String.format("Average Allocation Churn         : %.4f", avgChurn));
+        System.out.println(String.format("Average Deadline Slack           : %.4f", avgSlack));
         System.out.println("===================================================\n");
     }
 
@@ -202,6 +217,9 @@ public class FANETSimulation {
         double avgRuntimeSec = (masterController.totalSchedulingTimeNs / (double) invocations) / 1_000_000_000.0;
         double avgUavUtil = masterController.totalUAVUtilization / invocations;
         double avgCapUtil = masterController.totalCapacityUtilization / invocations;
+        double avgFairness = masterController.totalJainsFairness / invocations;
+        double avgChurn = masterController.totalAllocationChurn / invocations;
+        double avgSlack = masterController.totalDeadlineSlack / invocations;
         
         System.out.println("\n               UAV Task Scheduling Benchmark Results               ");
         System.out.println("╭──────────────────────────┬─────────────────────╮");
@@ -214,6 +232,9 @@ public class FANETSimulation {
         System.out.println(String.format("│ Average Completed Tasks  │ %-19.2f │", (double) totalCompleted / invocations));
         System.out.println(String.format("│ Average Failed Tasks     │ %-19.2f │", (double) totalFailed / invocations));
         System.out.println(String.format("│ Average Unassigned Tasks │ %-19.2f │", (double) totalUnassigned / invocations));
+        System.out.println(String.format("│ Average Jain's Fairness  │ %-19.4f │", avgFairness));
+        System.out.println(String.format("│ Average Allocation Churn │ %-19.4f │", avgChurn));
+        System.out.println(String.format("│ Average Deadline Slack   │ %-19.4f │", avgSlack));
         
         // Extract TaskScheduler to print Dynamic Repair specific metrics
         try {

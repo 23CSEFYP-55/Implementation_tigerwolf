@@ -24,22 +24,38 @@ import subprocess
 import sys
 import time
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+VENV_PYTHON = os.path.join(PROJECT_DIR, ".venv", "bin", "python")
+
+# Ensure OpenJDK is in PATH if installed via Homebrew
+for java_bin in [
+    "/opt/homebrew/opt/openjdk@21/bin",
+    "/opt/homebrew/opt/openjdk/bin",
+    "/usr/local/opt/openjdk@21/bin",
+    "/usr/local/opt/openjdk/bin",
+]:
+    if os.path.exists(java_bin) and java_bin not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = f"{java_bin}:{os.environ.get('PATH', '')}"
+
+# Auto re-exec with .venv python if available and not already using it
+if os.path.exists(VENV_PYTHON) and os.path.realpath(sys.executable) != os.path.realpath(VENV_PYTHON):
+    os.execv(VENV_PYTHON, [VENV_PYTHON] + sys.argv)
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import (BarColumn, Progress, TextColumn,
                            TaskProgressColumn, TimeElapsedColumn)
 from rich.table import Table
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-VENV_PYTHON = os.path.join(PROJECT_DIR, ".venv", "bin", "python")
 SERVERS = {
     "PPO": ("ppo_agent/tf_ppo_server.py", 5500),
     "CAR": ("ppo_agent/car_ppo_server.py", 5510),
     "MARL": ("ppo_agent/marl_allocation_server.py", 5501),
+    "TACC": ("ppo_agent/tacc_aav_server.py", 5530),
 }
 
 SCHEDULERS = ["MOGS", "LEXICOGRAPHIC", "BIDDING", "MARL", "DYNAMIC"]
-TRAJECTORIES = ["PPO", "CAR"]
+TRAJECTORIES = ["PPO", "CAR", "TACC"]
 
 JAVA_CP = f"out/production/iFogSim:jars/*:jars/commons-math3-3.5/*"
 
@@ -56,6 +72,9 @@ METRICS = [
     ("UAV Utilization", r"│ Average UAV Utilization\s*│\s*([\d.]+)\s*│", True),
     ("Capacity Utilization", r"│ Average Capacity Util\s*│\s*([\d.]+)\s*│", True),
     ("Unassigned Tasks", r"│ Average Unassigned Tasks\s*│\s*([\d.]+)\s*│", False),
+    ("Jain's Fairness", r"│ Average Jain's Fairness\s*│\s*([\d.]+)\s*│", True),
+    ("Allocation Churn", r"│ Average Allocation Churn\s*│\s*([\d.]+)\s*│", False),
+    ("Deadline Slack", r"│ Average Deadline Slack\s*│\s*([\d.]+)\s*│", True),
 ]
 # DYNAMIC-scheduler-only metrics (shown when available)
 DYNAMIC_METRICS = [
@@ -203,8 +222,17 @@ def main() -> None:
     if opts:
         scheds = [s.upper() for s in opts.get("sched", "").split(",") if s]
         scheds = [s for s in scheds if s in SCHEDULERS] or SCHEDULERS
-        trajs = {"ppo": ["PPO"], "car": ["CAR"], "both": ["PPO", "CAR"]} \
-            .get((opts.get("traj", "") or "both").lower(), ["PPO", "CAR"])
+        traj_opt = (opts.get("traj", "") or "all").lower()
+        if traj_opt in ("tacc", "tacc_aav"):
+            trajs = ["TACC"]
+        elif traj_opt == "ppo":
+            trajs = ["PPO"]
+        elif traj_opt == "car":
+            trajs = ["CAR"]
+        elif traj_opt == "both":
+            trajs = ["PPO", "CAR"]
+        else:
+            trajs = ["PPO", "CAR", "TACC"]
         try:
             num_runs = int(opts.get("runs", 3)) if opts else 3
         except ValueError:
@@ -212,8 +240,17 @@ def main() -> None:
     else:
         scheds = pick_choice("Select schedulers", SCHEDULERS, default=SCHEDULERS)
         console.print()
-        traj_raw = input("Trajectory models  [ppo / car / both] (default: both): ").strip().lower()
-        trajs = {"ppo": ["PPO"], "car": ["CAR"], "both": ["PPO", "CAR"]}.get(traj_raw, ["PPO", "CAR"])
+        traj_raw = input("Trajectory models  [ppo / car / tacc / all] (default: all): ").strip().lower()
+        if traj_raw in ("tacc", "tacc_aav"):
+            trajs = ["TACC"]
+        elif traj_raw == "ppo":
+            trajs = ["PPO"]
+        elif traj_raw == "car":
+            trajs = ["CAR"]
+        elif traj_raw == "both":
+            trajs = ["PPO", "CAR"]
+        else:
+            trajs = ["PPO", "CAR", "TACC"]
         raw = input("Runs per combination [int, default: 3]: ").strip()
         try:
             num_runs = max(1, int(raw))
@@ -233,7 +270,7 @@ def main() -> None:
     server_log_dir = os.path.join(out_dir, "servers")
     os.makedirs(server_log_dir, exist_ok=True)
 
-    needed = {"MARL", "PPO" if "PPO" in trajs else "", "CAR" if "CAR" in trajs else ""}
+    needed = {"MARL", "PPO" if "PPO" in trajs else "", "CAR" if "CAR" in trajs else "", "TACC" if "TACC" in trajs else ""}
     needed.discard("")
     procs = start_servers(needed, server_log_dir)
 

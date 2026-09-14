@@ -5,6 +5,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.List;
+import java.util.Locale;
 import org.fog.entities.FogDevice;
 import org.fog.entities.Tuple;
 
@@ -27,7 +28,11 @@ public class MarlClient {
 
     public static void disconnect() {
         try {
-            if (out != null) out.println("CLOSE\n");
+            if (out != null) {
+                out.println("CLOSE");
+                out.close();
+            }
+            if (in != null) in.close();
             if (socket != null) socket.close();
             System.out.println("Disconnected from MARL Allocation Server.");
         } catch (Exception e) {
@@ -36,7 +41,7 @@ public class MarlClient {
     }
 
     public static String getAssignments(List<Tuple> tasks, List<FogDevice> uavs) {
-        if (out == null || in == null) {
+        if (socket == null || socket.isClosed() || out == null || in == null) {
             return null;
         }
 
@@ -48,7 +53,7 @@ public class MarlClient {
                 FogDevice md = getMdForTask(t);
                 double x = md != null ? md.x_coord : 0.0;
                 double y = md != null ? md.y_coord : 0.0;
-                json.append(String.format("{\"id\": %d, \"comp\": %f, \"lat\": %f, \"x\": %f, \"y\": %f}",
+                json.append(String.format(Locale.US, "{\"id\": %d, \"comp\": %f, \"lat\": %f, \"x\": %f, \"y\": %f}",
                         t.getCloudletId(), (double) t.getCloudletLength(), t.tolerantLatency, x, y));
                 if (i < tasks.size() - 1) json.append(", ");
             }
@@ -56,8 +61,10 @@ public class MarlClient {
             for (int i = 0; i < uavs.size(); i++) {
                 FogDevice u = uavs.get(i);
                 double speed = u.getHost().getTotalMips(); // Approx processing speed
-                json.append(String.format("{\"id\": %d, \"active\": true, \"batt\": %f, \"cap\": %d, \"rem_cap\": %d, \"speed\": %f, \"x\": %f, \"y\": %f, \"radius\": %f}",
-                        u.getId(), u.getEnergyConsumption(), u.taskCapacity, u.taskCapacity - u.acceptedTasks.size(), speed, u.x_coord, u.y_coord, u.coverageRadius));
+                double maxBattJoules = 100000.0;
+                double battPct = Math.max(0.0, 100.0 * (1.0 - (u.getEnergyConsumption() / maxBattJoules)));
+                json.append(String.format(Locale.US, "{\"id\": %d, \"active\": true, \"batt\": %f, \"cap\": %d, \"rem_cap\": %d, \"speed\": %f, \"x\": %f, \"y\": %f, \"radius\": %f}",
+                        u.getId(), battPct, u.taskCapacity, u.taskCapacity - u.acceptedTasks.size(), speed, u.x_coord, u.y_coord, u.coverageRadius));
                 if (i < uavs.size() - 1) json.append(", ");
             }
             json.append("]}");
