@@ -223,7 +223,9 @@ def main() -> None:
         scheds = [s.upper() for s in opts.get("sched", "").split(",") if s]
         scheds = [s for s in scheds if s in SCHEDULERS] or SCHEDULERS
         traj_opt = (opts.get("traj", "") or "all").lower()
-        if traj_opt in ("tacc", "tacc_aav"):
+        if "," in traj_opt:
+            trajs = [t.upper() for t in traj_opt.split(",") if t.upper() in TRAJECTORIES] or TRAJECTORIES
+        elif traj_opt in ("tacc", "tacc_aav"):
             trajs = ["TACC"]
         elif traj_opt == "ppo":
             trajs = ["PPO"]
@@ -289,14 +291,18 @@ def main() -> None:
         for sched in scheds:
             for traj in trajs:
                 combo = f"{sched}/{traj}"
-                combo_dir = os.path.join(out_dir, f"{sched}_{traj}")
+                combo_dir = os.path.join(out_dir, traj, sched)
                 os.makedirs(combo_dir, exist_ok=True)
+                canonical_dir = os.path.join(PROJECT_DIR, "results", "by_trajectory", traj, sched)
+                os.makedirs(canonical_dir, exist_ok=True)
                 for run_no in range(1, num_runs + 1):
                     log_path = os.path.join(combo_dir, f"run-{run_no}.log")
                     progress.update(task, description=f"[cyan]{combo} run {run_no}/{num_runs}")
                     metrics = run_simulation(sched, traj, log_path)
                     if metrics:
                         results[combo].append(metrics)
+                        import shutil
+                        shutil.copyfile(log_path, os.path.join(canonical_dir, f"run-{run_no}.log"))
                     else:
                         console.print(f"[yellow]Warning: {combo} run {run_no} produced no metrics "
                                       f"(see {log_path}).[/yellow]")

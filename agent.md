@@ -79,19 +79,26 @@ javac --release 21 -d out/production/iFogSim -cp "jars/*:jars/commons-math3-3.5/
 ### Running Automated Mix-and-Match Benchmarking
 Use `run_compare.py` to run combinations of schedulers and trajectories:
 ```bash
-# Automated run with specific scheduler and trajectory
-.venv/bin/python run_compare.py --sched DYNAMIC,MOGS,MARL --traj PPO,CAR,TACC --runs 1
+# Automated run across all 15 combinations (3 trajectories x 5 schedulers)
+.venv/bin/python run_compare.py --sched DYNAMIC,MOGS,LEXICOGRAPHIC,BIDDING,MARL --traj PPO,CAR,TACC --runs 1
 
 # Interactive menu
 .venv/bin/python run_compare.py
 ```
+Outputs are canonicalized in:
+`results/by_trajectory/<TRAJECTORY>/<SCHEDULER>/run-<n>.log`
+as well as timestamped archive directories under `results/compare_<timestamp>/`.
 
-### Running 100-Epoch Graph Generation
-Generates all 9 comparison plots across 100 epochs:
+### Running Cross-Multiplied Graph Generation
+Cross-multiplies all 3 trajectory algorithms (`PPO`, `CAR`, `TACC`) with all 5 task schedulers (`DYNAMIC`, `MOGS`, `LEXICOGRAPHIC`, `BIDDING`, `MARL`):
 ```bash
-.venv/bin/python graph_generator.py 1
+# Render from stored logs in results/by_trajectory/ (instant)
+.venv/bin/python graph_generator.py
+
+# Force re-running simulations
+.venv/bin/python graph_generator.py --run
 ```
-Generated plots in repository root:
+Generated 3-panel cross-trajectory plots ($1 \times 3$ subplots: PPO | CAR | TACC):
 * `throughput_comparison.png`
 * `runtime_comparison.png`
 * `utilization_comparison.png`
@@ -101,12 +108,27 @@ Generated plots in repository root:
 * `fairness_comparison.png`
 * `churn_comparison.png`
 * `slack_margin_comparison.png`
+Macro cross-product summary:
+* `trajectory_cross_summary.png` (4-panel grouped bar chart comparing all 15 combinations across Success Rate, Overhead, Fairness, and Slack)
+
+### Running 2D Spatial Trajectory Map Visualizer
+Visualizes continuous 2D flight paths across the $2000\text{m} \times 2000\text{m}$ area for all trajectory algorithms:
+```bash
+.venv/bin/python trajectory_map_generator.py
+```
+Generated trajectory map figures:
+* `trajectory_maps_all.png` (3-panel publication-quality comparative figure: PPO vector flow | CAR Otsu TSP tours | TACC-AAV comm gating & ACBBA bundles)
+* `trajectory_map_ppo.png` (high-res PPO flight paths & MD density flow)
+* `trajectory_map_car.png` (high-res CAR region partitions, cluster centroids, and pointer-net TSP tours)
+* `trajectory_map_tacc.png` (high-res TACC-AAV continuous heading flight paths with communication gating segments)
 
 ### Running Single Simulation Directly
 ```bash
 # Schedulers: DYNAMIC, MOGS, LEXICOGRAPHIC, BIDDING, MARL
 # Trajectories: PPO, CAR, TACC
 bash run_single_sim.sh DYNAMIC PPO
+bash run_single_sim.sh DYNAMIC CAR
+bash run_single_sim.sh DYNAMIC TACC
 ```
 
 ### Running Unit Tests & Visual Demonstrations
@@ -131,7 +153,11 @@ bash run_single_sim.sh DYNAMIC PPO
 ---
 
 ## 7. Change Log & Maintenance Rules
-* **2026-09:** Implemented 3 new real-time allocation metrics (Jain's Fairness, Allocation Churn, Deadline Slack) in `Controller.java`, `FANETSimulation.java`, and `run_compare.py`.
-* **2026-09:** Extended simulation to 100 epochs; regenerated all 9 time-series plots.
-* **2026-09:** Resolved MARL throughput collapse via geometric candidate masking ($d \le R_{\text{cov}}$) and battery headroom calculation in `MarlClient.java` / `marl_allocation_server.py`.
+* **2026-09:** Organized simulation results into trajectory-grouped canonical directories (`results/by_trajectory/<TRAJ>/<SCHED>/run-<n>.log`).
+* **2026-09:** Upgraded `graph_generator.py` to perform full Cartesian cross-multiplication ($3\text{ Trajectories} \times 5\text{ Schedulers} = 15\text{ combinations}$) with 3-panel comparative figures and macro summary bar charts (`trajectory_cross_summary.png`).
+* **2026-09:** Implemented 2D spatial trajectory map visualizer (`trajectory_map_generator.py`) producing `trajectory_maps_all.png`, `trajectory_map_ppo.png`, `trajectory_map_car.png`, and `trajectory_map_tacc.png`.
+* **2026-09:** Upgraded `run_single_sim.sh` to accept both scheduler and trajectory arguments (`./run_single_sim.sh <SCHED> <TRAJ>`), dynamically managing server ports.
+* **2026-09:** Added `[TRAJECTORY_EPOCH]` real-time coordinate telemetry to `Controller.java`.
 * **2026-09:** Implemented and benchmarked TACC-AAV algorithm (`tacc_aav.py`, `tacc_aav_server.py`, `TACCAAVTrajectoryModel.java`, `test_tacc_aav.py`, `demo_tacc_aav.py`).
+* **2026-09:** Resolved MARL throughput collapse via geometric candidate masking ($d \le R_{\text{cov}}$) and battery headroom calculation in `MarlClient.java` / `marl_allocation_server.py`.
+* **2026-09:** Extended simulation to 100 epochs; regenerated all time-series plots.

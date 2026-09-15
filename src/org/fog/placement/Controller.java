@@ -497,6 +497,14 @@ public class Controller extends SimEntity {
 		System.out.println(String.format("[METRIC_EPOCH] Epoch:%d, Generated:%d, Scheduled:%d, Dropped:%d, RuntimeMs:%.4f, UavUtil:%.4f, CapUtil:%.4f, RepairQ:%d, Invalid:%d, Reassigned:%d, Fairness:%.4f, Churn:%.4f, Slack:%.4f",
 				schedulingInvocations, taskWaitingPool.size(), scheduledInBatch, droppedInBatch, currentRuntimeMs, currentUavUtil, currentCapUtil, rqLen, inv, re, currentFairness, currentChurn, currentSlack));
 
+		// Output trajectory coordinates for spatial mapping
+		StringBuilder trajSb = new StringBuilder();
+		trajSb.append(String.format("[TRAJECTORY_EPOCH] Epoch:%d", schedulingInvocations));
+		for (FogDevice uav : uavs) {
+			trajSb.append(String.format(java.util.Locale.US, " | %s:%.1f,%.1f", uav.getName(), uav.x_coord, uav.y_coord));
+		}
+		System.out.println(trajSb.toString());
+
 		// 5. Clear the pool for the next batch
 		taskWaitingPool.clear();
 
