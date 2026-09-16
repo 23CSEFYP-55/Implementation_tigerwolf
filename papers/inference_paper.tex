@@ -72,8 +72,11 @@ Each UAV $u_j \in \mathcal{U}$ operates at a fixed cruise altitude $H = 50\,\tex
 
 Following the aerodynamic propulsion model of Zhang \textit{et al.} \cite{zhang2019energy} and Wu \textit{et al.} \cite{wu2018joint}, the horizontal flight power of UAV $u_j$ moving at forward speed $v_j(t)$ is expressed as:
 \begin{equation}
-    P_j(v_j) = P_0 \left(1 + \frac{3 v_j^2}{U_{\text{tip}}^2}\right) + P_i \left(\sqrt{1 + \frac{v_j^4}{4 v_0^4}} - \frac{v_j^2}{2 v_0^2}\right)^{1/2} + \frac{1}{2} d_0 \rho s A v_j^3,
-    \label{eq:propulsion}
+\begin{aligned}
+    P_j(v_j) = & \; P_0 \left(1 + \frac{3 v_j^2}{U_{\text{tip}}^2}\right) + \frac{1}{2} d_0 \rho s A v_j^3 \\
+    & + P_i \left(\sqrt{1 + \frac{v_j^4}{4 v_0^4}} - \frac{v_j^2}{2 v_0^2}\right)^{1/2},
+\end{aligned}
+\label{eq:propulsion}
 \end{equation}
 where $P_0$ and $P_i$ denote blade profile and induced power in hovering state, $U_{\text{tip}}$ is tip speed of the rotor blades, $v_0$ is mean rotor induced velocity, $d_0$ is fuselage drag ratio, $s$ is rotor solidity, $\rho$ is air density, and $A$ is rotor disc area.
 
@@ -184,7 +187,7 @@ TACC-AAV & MARL & 6.36\% & 11.8847 & 0.5103 & 0.1764 \\
 \end{figure*}
 
 \subsection{Inference 1: Throughput Domination via Adaptive Region Partitioning}
-As demonstrated in Fig.~\ref{fig:macro_summary}(a) and Fig.~\ref{fig:throughput_time}, the **CAR** trajectory model consistently achieves superior scheduling success rates across all schedulers, reaching a peak of **$35.73\%$** under LEXICOGRAPHIC and **$33.06\%$** under MARL. In contrast, PPO tops out at $13.81\%$ and TACC-AAV at $7.07\%$.
+As demonstrated in Fig.~\ref{fig:macro_summary}(a) and Fig.~\ref{fig:throughput_time}, the \textbf{CAR} trajectory model consistently achieves superior scheduling success rates across all schedulers, reaching a peak of \textbf{35.73\%} under LEXICOGRAPHIC and \textbf{33.06\%} under MARL. In contrast, PPO tops out at $13.81\%$ and TACC-AAV at $7.07\%$.
 
 \textbf{Physical Rationale:} PPO steers UAVs strictly according to local gradient vectors. As depicted in the spatial map of Fig.~\ref{fig:trajectory_maps}(a), multiple UAVs gravitate toward the same high-density MD clusters. This spatial crowding causes excessive overlapping coverage zones; simultaneously, peripheral MDs are starved of edge servers. 
 In sharp contrast, CAR (Fig.~\ref{fig:trajectory_maps}(b)) employs Otsu density partitioning to segment the entire operational theater into non-overlapping capability regions. Each UAV is explicitly assigned to its own region and follows a Pointer-Network TSP tour through that region's waypoints. This guarantees spatial dispersion across the swarm, maximizing cumulative aggregate coverage and eliminating inter-UAV buffer contention.
@@ -192,19 +195,19 @@ In sharp contrast, CAR (Fig.~\ref{fig:trajectory_maps}(b)) employs Otsu density 
 \subsection{Inference 2: Sub-Millisecond Algorithmic Scalability of DYNAMIC Repair}
 As highlighted in Table~\ref{tab:benchmark_results} and Fig.~\ref{fig:macro_summary}(b), the runtime overhead exhibits dramatic divergence across paradigms:
 \begin{itemize}
-    \item **DYNAMIC:** Consistently executes in **$0.065$--$0.205\,\text{ms}$** per batch.
-    \item **MOGS:** Requires $0.153$--$2.313\,\text{ms}$.
-    \item **LEXICOGRAPHIC:** Requires $0.356$--$1.102\,\text{ms}$.
-    \item **BIDDING:** Requires $7.659$--$10.361\,\text{ms}$.
-    \item **MARL:** Requires **$11.216$--$14.412\,\text{ms}$**.
+    \item \textbf{DYNAMIC:} Consistently executes in \textbf{0.065--0.205\,ms} per batch.
+    \item \textbf{MOGS:} Requires $0.153$--$2.313\,\text{ms}$.
+    \item \textbf{LEXICOGRAPHIC:} Requires $0.356$--$1.102\,\text{ms}$.
+    \item \textbf{BIDDING:} Requires $7.659$--$10.361\,\text{ms}$.
+    \item \textbf{MARL:} Requires \textbf{11.216--14.412\,ms}.
 \end{itemize}
 
-\textbf{Mathematical Explanation:} Baseline algorithms rebuild task-UAV matching graphs from scratch ($O(|\mathcal{K}_t| \cdot |\mathcal{U}|)$). For iterative auctions (BIDDING), convergence requires multiple round-trip broadcast rounds. For MARL, forward passes through deep neural networks (`RequestNet` and `ResponseNet`) incur substantial tensor manipulation overhead. 
+\textbf{Mathematical Explanation:} Baseline algorithms rebuild task-UAV matching graphs from scratch ($O(|\mathcal{K}_t| \cdot |\mathcal{U}|)$). For iterative auctions (BIDDING), convergence requires multiple round-trip broadcast rounds. For MARL, forward passes through deep neural networks (`RequestNet' and `ResponseNet') incur substantial tensor manipulation overhead. 
 In contrast, DYNAMIC operates on an \textit{incremental matching maintenance} principle:
 \begin{equation}
     \mathcal{A}_{t} = \left(\mathcal{A}_{t-1} \setminus \mathcal{A}_{\text{broken}}\right) \cup \text{RepairQueue}(\Delta \mathcal{K}_t),
 \end{equation}
-where $|\mathcal{A}_{\text{broken}}| \ll |\mathcal{A}_{t-1}|$. By selectively re-matching only invalidated associations ($d > R_{\text{cov}}$) and newly arriving tasks via local P2P offloading ($d \le 500\,\text{m}$), DYNAMIC reduces the active search space by over $90\%$, delivering up to a **$140\times$ speedup** over deep learning and auction baselines.
+where $|\mathcal{A}_{\text{broken}}| \ll |\mathcal{A}_{t-1}|$. By selectively re-matching only invalidated associations ($d > R_{\text{cov}}$) and newly arriving tasks via local P2P offloading ($d \le 500\,\text{m}$), DYNAMIC reduces the active search space by over $90\%$, delivering up to a \textbf{140$\times$ speedup} over deep learning and auction baselines.
 
 \subsection{Inference 3: Workload Equity and Swarm Fairness Dynamics}
 Workload distribution balance is evaluated via Jain's Fairness Index \cite{jain1984quantitative}:
@@ -213,20 +216,20 @@ Workload distribution balance is evaluated via Jain's Fairness Index \cite{jain1
 \end{equation}
 Fig.~\ref{fig:fairness_time} illustrates that under the CAR trajectory, all schedulers achieve high fairness ($\mathcal{J} \in [0.81, 0.89]$). Under PPO and TACC-AAV, however, fairness varies widely.
 
-\textbf{Insight:} In PPO, greedy schedulers like LEXICOGRAPHIC ($\mathcal{J} = 0.369$) and MARL ($\mathcal{J} = 0.319$) overload the few UAVs that successfully reach central MD clusters, leaving peripheral UAVs idle. Under DYNAMIC, however, cooperative P2P offloading redistributes excess tasks from saturated UAVs to nearby reachable peers, elevating PPO fairness to **$0.614$** and TACC-AAV fairness to **$0.665$**.
+\textbf{Insight:} In PPO, greedy schedulers like LEXICOGRAPHIC ($\mathcal{J} = 0.369$) and MARL ($\mathcal{J} = 0.319$) overload the few UAVs that successfully reach central MD clusters, leaving peripheral UAVs idle. Under DYNAMIC, however, cooperative P2P offloading redistributes excess tasks from saturated UAVs to nearby reachable peers, elevating PPO fairness to \textbf{0.614} and TACC-AAV fairness to \textbf{0.665}.
 
 \subsection{Inference 4: Deadline Slack Optimization in TACC-AAV}
 The average normalized deadline slack margin $\bar{S}$ is given by:
 \begin{equation}
     \bar{S} = \frac{1}{|\mathcal{K}_{\text{sched}}|} \sum_{k \in \mathcal{K}} \max\left(0, \; \frac{T_k^{\text{tol}} - (T_{\text{tx}} + T_{\text{proc}})}{T_k^{\text{tol}}}\right).
 \end{equation}
-Fig.~\ref{fig:macro_summary}(d) reveals that **TACC-AAV** achieves the highest slack margin across all configurations, reaching **$0.392$** with DYNAMIC and **$0.351$** with BIDDING.
+Fig.~\ref{fig:macro_summary}(d) reveals that \textbf{TACC-AAV} achieves the highest slack margin across all configurations, reaching \textbf{0.392} with DYNAMIC and \textbf{0.351} with BIDDING.
 
 \textbf{Analytical Rationale:} TACC-AAV incorporates the aerodynamic battery model $N_j(E_j)$. As a UAV's energy depletes, its task intake limit is proactively throttled. Consequently, UAV buffers never saturate to full capacity ($C_j = 150$). Queuing delay $T_{\text{queue}} = |\mathcal{Q}_j| \cdot (c_k / f_j)$ remains minimal, ensuring scheduled tasks are executed with maximum safety headroom before deadline expiry.
 
 \subsection{Inference 5: Spatial Vector Flow and Communication Gating Trade-Offs}
 Fig.~\ref{fig:trajectory_maps}(c) visualizes the continuous flight paths of TACC-AAV. The MOCPO gating policy dynamically segments flight trajectories into active broadcasting (solid green) and suppressed gating (dashed cyan).
-Across $100$ epochs, TACC-AAV achieved a **$50.0\%$ reduction in inter-UAV broadcast packets**. Because UAVs broadcast consensus bundles $(z, y, s)$ only when state prediction error exceeds the MOCPO threshold, swarm-wide channel congestion is curtailed, preserving critical wireless spectrum for ground data offloading.
+Across $100$ epochs, TACC-AAV achieved a \textbf{50.0\% reduction in inter-UAV broadcast packets}. Because UAVs broadcast consensus bundles $(z, y, s)$ only when state prediction error exceeds the MOCPO threshold, swarm-wide channel congestion is curtailed, preserving critical wireless spectrum for ground data offloading.
 
 % ==============================================================================
 % SECTION V: ARCHITECTURAL GUIDELINES
