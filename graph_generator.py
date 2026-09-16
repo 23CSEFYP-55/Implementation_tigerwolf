@@ -37,6 +37,8 @@ from rich.table import Table
 console = Console()
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(PROJECT_DIR, "results", "by_trajectory")
+OUTPUT_DIR = os.path.join(PROJECT_DIR, "images", "benchmarks")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 TRAJECTORIES = ["PPO", "CAR", "TACC"]
 SCHEDULERS = {
@@ -212,7 +214,7 @@ def generate_graphs():
                 ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
 
         fig.suptitle(f"{title} (Cross-Trajectory Comparison)", fontsize=14, fontweight="bold", y=0.96)
-        out_file = os.path.join(PROJECT_DIR, filename)
+        out_file = os.path.join(OUTPUT_DIR, filename)
         plt.savefig(out_file, dpi=200)
         plt.close()
         console.print(f"  [green]✓[/green] Saved 3-panel cross-trajectory plot -> [bold]{filename}[/bold]")
@@ -267,7 +269,7 @@ def generate_graphs():
         ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
 
     fig.suptitle("Full Cross-Multiplication Benchmark Summary (3 Trajectories × 5 Schedulers)", fontsize=15, fontweight="bold", y=0.97)
-    summary_path = os.path.join(PROJECT_DIR, "trajectory_cross_summary.png")
+    summary_path = os.path.join(OUTPUT_DIR, "trajectory_cross_summary.png")
     plt.savefig(summary_path, dpi=200)
     plt.close()
     console.print(f"  [bold green]✓ Saved macro cross-summary chart -> trajectory_cross_summary.png[/bold green]\n")

@@ -98,29 +98,44 @@ Cross-multiplies all 3 trajectory algorithms (`PPO`, `CAR`, `TACC`) with all 5 t
 # Force re-running simulations
 .venv/bin/python graph_generator.py --run
 ```
-Generated 3-panel cross-trajectory plots ($1 \times 3$ subplots: PPO | CAR | TACC):
-* `throughput_comparison.png`
-* `runtime_comparison.png`
-* `utilization_comparison.png`
-* `capacity_utilization_comparison.png`
-* `queue_length_comparison.png`
-* `repair_queue_comparison.png`
-* `fairness_comparison.png`
-* `churn_comparison.png`
-* `slack_margin_comparison.png`
+Generated 3-panel cross-trajectory plots in `images/benchmarks/` ($1 \times 3$ subplots: PPO | CAR | TACC):
+* `images/benchmarks/throughput_comparison.png`
+* `images/benchmarks/runtime_comparison.png`
+* `images/benchmarks/utilization_comparison.png`
+* `images/benchmarks/capacity_utilization_comparison.png`
+* `images/benchmarks/queue_length_comparison.png`
+* `images/benchmarks/repair_queue_comparison.png`
+* `images/benchmarks/fairness_comparison.png`
+* `images/benchmarks/churn_comparison.png`
+* `images/benchmarks/slack_margin_comparison.png`
 Macro cross-product summary:
-* `trajectory_cross_summary.png` (4-panel grouped bar chart comparing all 15 combinations across Success Rate, Overhead, Fairness, and Slack)
+* `images/benchmarks/trajectory_cross_summary.png` (4-panel grouped bar chart comparing all 15 combinations across Success Rate, Overhead, Fairness, and Slack)
 
 ### Running 2D Spatial Trajectory Map Visualizer
 Visualizes continuous 2D flight paths across the $2000\text{m} \times 2000\text{m}$ area for all trajectory algorithms:
 ```bash
 .venv/bin/python trajectory_map_generator.py
 ```
-Generated trajectory map figures:
-* `trajectory_maps_all.png` (3-panel publication-quality comparative figure: PPO vector flow | CAR Otsu TSP tours | TACC-AAV comm gating & ACBBA bundles)
-* `trajectory_map_ppo.png` (high-res PPO flight paths & MD density flow)
-* `trajectory_map_car.png` (high-res CAR region partitions, cluster centroids, and pointer-net TSP tours)
-* `trajectory_map_tacc.png` (high-res TACC-AAV continuous heading flight paths with communication gating segments)
+Generated trajectory map figures in `images/trajectories/`:
+* `images/trajectories/trajectory_maps_all.png` (3-panel publication-quality comparative figure: PPO vector flow | CAR Otsu TSP tours | TACC-AAV comm gating & ACBBA bundles)
+* `images/trajectories/trajectory_map_ppo.png` (high-res PPO flight paths & MD density flow)
+* `images/trajectories/trajectory_map_car.png` (high-res CAR region partitions, cluster centroids, and pointer-net TSP tours)
+* `images/trajectories/trajectory_map_tacc.png` (high-res TACC-AAV continuous heading flight paths with communication gating segments)
+
+### IEEE Transactions Research Paper
+A complete, self-contained scholarly research article analyzing all 15 trajectory $\times$ scheduler combinations:
+* **LaTeX Source:** `papers/inference_paper.tex`
+* **BibTeX References:** `papers/references.bib`
+* **Document Class:** `papers/IEEEtran.cls` (IEEEtran v1.8b)
+
+To compile to PDF (on any system with LaTeX / MacTeX / Overleaf):
+```bash
+cd papers
+pdflatex inference_paper.tex
+bibtex inference_paper
+pdflatex inference_paper.tex
+pdflatex inference_paper.tex
+```
 
 ### Running Single Simulation Directly
 ```bash
@@ -136,7 +151,7 @@ bash run_single_sim.sh DYNAMIC TACC
 # Pytest unit tests
 .venv/bin/pytest tests/ -v
 
-# TACC-AAV visual simulation demo (produces tacc_aav_trajectories.png)
+# TACC-AAV visual simulation demo (produces images/trajectories/tacc_aav_trajectories.png)
 .venv/bin/python demo_tacc_aav.py
 ```
 
@@ -153,8 +168,10 @@ bash run_single_sim.sh DYNAMIC TACC
 ---
 
 ## 7. Change Log & Maintenance Rules
+* **2026-09:** Cleaned up repository root and organized all visual image assets into structured subdirectories (`images/benchmarks/`, `images/trajectories/`, `images/legacy/`). Updated generation scripts to output directly to these targets.
+* **2026-09:** Authored complete research paper in IEEE Transactions format (`papers/inference_paper.tex`, `papers/references.bib`, `papers/IEEEtran.cls`) presenting empirical inferences and architectural guidelines for all 15 trajectory $\times$ scheduler combinations.
 * **2026-09:** Organized simulation results into trajectory-grouped canonical directories (`results/by_trajectory/<TRAJ>/<SCHED>/run-<n>.log`).
-* **2026-09:** Upgraded `graph_generator.py` to perform full Cartesian cross-multiplication ($3\text{ Trajectories} \times 5\text{ Schedulers} = 15\text{ combinations}$) with 3-panel comparative figures and macro summary bar charts (`trajectory_cross_summary.png`).
+* **2026-09:** Upgraded `graph_generator.py` to perform full Cartesian cross-multiplication ($3\text{ Trajectories} \times 5\text{ Schedulers} = 15\text{ combinations}$) with 3-panel comparative figures and macro summary bar charts (`images/benchmarks/trajectory_cross_summary.png`).
 * **2026-09:** Implemented 2D spatial trajectory map visualizer (`trajectory_map_generator.py`) producing `trajectory_maps_all.png`, `trajectory_map_ppo.png`, `trajectory_map_car.png`, and `trajectory_map_tacc.png`.
 * **2026-09:** Upgraded `run_single_sim.sh` to accept both scheduler and trajectory arguments (`./run_single_sim.sh <SCHED> <TRAJ>`), dynamically managing server ports.
 * **2026-09:** Added `[TRAJECTORY_EPOCH]` real-time coordinate telemetry to `Controller.java`.

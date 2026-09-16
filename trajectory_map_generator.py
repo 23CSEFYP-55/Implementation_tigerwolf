@@ -26,6 +26,8 @@ from rich.console import Console
 
 console = Console()
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(PROJECT_DIR, "images", "trajectories")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 MAP_BOUND = 2000.0
 
 
@@ -277,7 +279,7 @@ def generate_all_trajectory_maps():
     ax3.legend(loc="lower right", fontsize=8, framealpha=0.9)
 
     fig.suptitle("2D Spatial Trajectory Map Comparison Across All Trajectory Planning Models", fontsize=15, fontweight="bold", y=0.98)
-    all_maps_path = os.path.join(PROJECT_DIR, "trajectory_maps_all.png")
+    all_maps_path = os.path.join(OUTPUT_DIR, "trajectory_maps_all.png")
     plt.savefig(all_maps_path, dpi=300)
     plt.close()
     console.print(f"[bold green]Saved 3-panel comparative trajectory map to {all_maps_path}[/bold green]")
@@ -302,7 +304,7 @@ def generate_all_trajectory_maps():
         ax.set_xlabel("X Coordinate (m)", fontsize=11)
         ax.set_ylabel("Y Coordinate (m)", fontsize=11)
         ax.grid(True, linestyle="--", alpha=0.6)
-        out_path = os.path.join(PROJECT_DIR, filename)
+        out_path = os.path.join(OUTPUT_DIR, filename)
         plt.tight_layout()
         plt.savefig(out_path, dpi=300)
         plt.close()

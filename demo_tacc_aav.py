@@ -164,7 +164,9 @@ def run_demo():
              fontsize=12, fontweight='bold', color="#1d4e89")
     
     plt.tight_layout()
-    plot_path = "tacc_aav_trajectories.png"
+    plot_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", "trajectories")
+    os.makedirs(plot_dir, exist_ok=True)
+    plot_path = os.path.join(plot_dir, "tacc_aav_trajectories.png")
     plt.savefig(plot_path, dpi=200)
     print(f"Saved trajectory and gating visualization to {plot_path}")
 
