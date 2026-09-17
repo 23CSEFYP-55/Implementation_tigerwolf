@@ -168,6 +168,7 @@ bash run_single_sim.sh DYNAMIC TACC
 ---
 
 ## 7. Change Log & Maintenance Rules
+* **2026-09:** Refined research paper (`papers/inference_paper.tex` and `papers/inference_paper.pdf`): removed journal headers (`\markboth`) and all citations/references section; verified clean 7-page compilation containing complete parameters formulation and all embedded benchmark/trajectory graphs.
 * **2026-09:** Updated IEEE Transactions paper (`papers/inference_paper.tex` and `papers/inference_paper.pdf`): set affiliation to Amrita Vishwa Vidyapeetham, Coimbatore Campus; streamlined structure by removing generic introductory and conclusion boilerplate; implemented parameter-first technical formulation followed by data-driven empirical inferences; embedded all primary benchmark graphs (throughput, runtime overhead, Jain's fairness, deadline slack margin, allocation churn, queue length backlogs, capacity utilization, 2D spatial trajectory maps, and macro cross-product summary); compiled cleanly to PDF via `tectonic`.
 * **2026-09:** Cleaned up repository root and organized all visual image assets into structured subdirectories (`images/benchmarks/`, `images/trajectories/`, `images/legacy/`). Updated generation scripts to output directly to these targets.
 * **2026-09:** Authored complete research paper in IEEE Transactions format (`papers/inference_paper.tex`, `papers/references.bib`, `papers/IEEEtran.cls`) presenting empirical inferences and architectural guidelines for all 15 trajectory $\times$ scheduler combinations.

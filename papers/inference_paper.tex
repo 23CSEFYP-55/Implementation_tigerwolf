@@ -9,8 +9,6 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{booktabs}
-\usepackage{cite}
-\usepackage{url}
 \usepackage{microtype}
 
 % Float placement optimization for multi-figure document
@@ -31,10 +29,7 @@
 
 \author{Project Team 55, Department of Computer Science and Engineering\\
 Amrita Vishwa Vidyapeetham, Coimbatore Campus%
-\thanks{Manuscript submitted September 2026. Experimental results generated on extended iFogSim2 FANET-MEC benchmark platform.}}
-
-\markboth{IEEE Transactions on Mobile Computing / IEEE Internet of Things Journal,~Vol.~XX, No.~X,~September~2026}%
-{Project Team 55: Trajectory Optimization and Task Allocation in Multi-UAV FANET-MEC}
+\thanks{Experimental results generated on extended iFogSim2 FANET-MEC benchmark platform.}}
 
 \maketitle
 
@@ -76,7 +71,7 @@ An aerial fleet $\mathcal{U} = \{u_1, u_2, \dots, u_N\}$ of $N = 30$ heterogeneo
     \item $v_{\text{max}} = 25.0\,\text{m/s}$: Maximum allowable forward horizontal flight velocity.
 \end{itemize}
 
-Following the aerodynamic propulsion power model of Zhang \textit{et al.} \cite{zhang2019energy} and Wu \textit{et al.} \cite{wu2018joint}, the horizontal flight power consumption $P_j(v_j)$ of UAV $u_j$ moving at forward speed $v_j(t)$ is expressed as:
+Following the aerodynamic propulsion power model of Zhang \textit{et al.} and Wu \textit{et al.}, the horizontal flight power consumption $P_j(v_j)$ of UAV $u_j$ moving at forward speed $v_j(t)$ is expressed as:
 \begin{equation}
 \begin{aligned}
     P_j(v_j) = & \; P_0 \left(1 + \frac{3 v_j^2}{U_{\text{tip}}^2}\right) + \frac{1}{2} d_0 \rho s A v_j^3 \\
@@ -95,18 +90,18 @@ where $E_{\text{reserve}} = 50\,\text{kJ}$ is return-to-base energy and $E_{\tex
 
 \subsection{Evaluated Trajectory Optimization Models}
 \begin{enumerate}
-    \item \textbf{Trajectory-Feedback PPO (PPO) \cite{schulman2017proximal}:} Discretizes the local sensory range of each drone into an $8$-sector cardinal/intercardinal partition. An actor-critic policy network outputs continuous 2D displacement vectors $[\Delta x_j, \Delta y_j]$, steering drones along local density gradients.
-    \item \textbf{Capability-Aware Adaptive Route Optimization (CAR) \cite{guo2023uav}:} Applies distance-density metrics and Otsu thresholding to segment the terrain into spatial capability clusters with centroids ($\bigstar$). Pointer Networks \cite{vinyals2015pointer} solve the Traveling Salesperson Problem (TSP) over localized waypoints ($\blacksquare$), generating cyclic patrol loops.
+    \item \textbf{Trajectory-Feedback PPO (PPO):} Discretizes the local sensory range of each drone into an $8$-sector cardinal/intercardinal partition. An actor-critic policy network outputs continuous 2D displacement vectors $[\Delta x_j, \Delta y_j]$, steering drones along local density gradients.
+    \item \textbf{Capability-Aware Adaptive Route Optimization (CAR):} Applies distance-density metrics and Otsu thresholding to segment the terrain into spatial capability clusters with centroids ($\bigstar$). Pointer Networks solve the Traveling Salesperson Problem (TSP) over localized waypoints ($\blacksquare$), generating cyclic patrol loops.
     \item \textbf{Task Allocation with Communication Coordination (TACC-AAV):} Couples Multi-Objective Constrained Policy Optimization (MOCPO) for communication gating $a_{j,t} \in \{0, 1\}$ with Multi-Head Self-Attention (MHSA) heading kinematics $[v_j, \vartheta_j]$ conditioned on winning consensus bundles $(z, y, s)$ from an Asynchronous Consensus-Based Bundle Algorithm (ACBBA).
 \end{enumerate}
 
 \subsection{Evaluated Task Allocation Schedulers}
 \begin{enumerate}
     \item \textbf{DYNAMIC (Proposed Dynamic Repair):} Maintains active task-UAV bindings in a registry $\mathcal{A}_t$. Broken links caused by flight mobility ($d(i, j) > R_{\text{cov}}$) are placed into an incremental repair queue $\text{RepairQueue}(\Delta \mathcal{K}_t)$ and resolved via local re-matching or cooperative peer-to-peer (P2P) offloading ($d(u_1, u_2) \le 500\,\text{m}$) without reconstructing the global assignment bipartite graph.
-    \item \textbf{MOGS (Many-to-One Gale-Shapley Matching) \cite{gale1962college}:} Formulates matching from scratch every epoch based on mutual distance and queue lengths, executing iterative proposal-rejection rounds until two-sided stability is attained.
+    \item \textbf{MOGS (Many-to-One Gale-Shapley Matching):} Formulates matching from scratch every epoch based on mutual distance and queue lengths, executing iterative proposal-rejection rounds until two-sided stability is attained.
     \item \textbf{LEXICOGRAPHIC:} Priority-driven greedy allocation sorting waiting tasks by ascending deadline slack $S_k = T_k^{\text{tol}} - (T_{\text{tx}} + T_{\text{proc}})$, matching them to available in-range UAVs.
     \item \textbf{BIDDING (Contract-Net Protocol Auction):} Multi-round auction wherein UAVs evaluate in-range tasks and submit competitive bids based on marginal queue latency and transmission distance.
-    \item \textbf{MARL (Multi-Agent Deep RL) \cite{lowe2017multi}:} A two-tier neural architecture comprising `RequestNet' (actor-critic MD-to-UAV candidate selection with $d \le R_{\text{cov}}$ geometric masking) and `ResponseNet' (DQN UAV queue admission).
+    \item \textbf{MARL (Multi-Agent Deep RL):} A two-tier neural architecture comprising `RequestNet' (actor-critic MD-to-UAV candidate selection with $d \le R_{\text{cov}}$ geometric masking) and `ResponseNet' (DQN UAV queue admission).
 \end{enumerate}
 
 % ==============================================================================
@@ -304,14 +299,5 @@ Fig.~\ref{fig:cap_util_time} illustrates fleet-wide capacity utilization ($\sum 
     \item TACC-AAV dynamically contracts capacity as battery reserve drops, maintaining conservative utilization ($15\%$--$25\%$) to prevent mid-air battery exhaustion.
 \end{itemize}
 
-% ==============================================================================
-% REFERENCES
-% ==============================================================================
-
-% ==============================================================================
-% REFERENCES
-% ==============================================================================
-\bibliographystyle{IEEEtran}
-\bibliography{references}
-
 \end{document}
+
