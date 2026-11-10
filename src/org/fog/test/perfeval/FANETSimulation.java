@@ -48,7 +48,7 @@ public class FANETSimulation {
 
     // Application, UAV count, and HARD LIMITS
     static int numUAVs = 30;
-    static int NUM_MDS = 100; // 100 MDs
+    static int NUM_MDS = 800; // 800 MDs default
     static double SENSOR_TRANSMISSION_TIME = 1000.0; // Mean time (lambda) for Poisson
 
     // --- Time Limit (extended to allow 100 epochs) ---
@@ -70,6 +70,14 @@ public class FANETSimulation {
                 numUAVs = Integer.parseInt(args[2].trim());
             } catch (Exception e) {
                 numUAVs = 30;
+            }
+        }
+
+        if (args.length > 3 && !args[3].trim().isEmpty()) {
+            try {
+                NUM_MDS = Integer.parseInt(args[3].trim());
+            } catch (Exception e) {
+                NUM_MDS = 800;
             }
         }
         
