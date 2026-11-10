@@ -51,25 +51,79 @@ def parse_simulation_trajectories(log_path: str) -> dict[str, list[tuple[float, 
 
 
 def generate_synthetic_scenario(seed: int = 42):
-    """Generates standard scenario layout matching FANETSimulation parameters."""
+    """Generates realistic structured spatial layout matching FANETSimulation parameters:
+    - 40% Urban Demand Hubs (4 regional clusters at (500,500), (1500,500), (500,1500), (1500,1500))
+    - 36% Arterial Transit Corridors connecting hubs with lateral jitter
+    - 24% Low-Discrepancy Peripheral Grid with spatial perturbation
+    """
     rng = np.random.default_rng(seed)
-    # 100 MDs clustered into 4 hot spots + uniform background
-    md_clusters = [
-        (400, 450, 180, 25),
-        (1550, 400, 160, 25),
-        (1450, 1500, 200, 25),
-        (500, 1550, 170, 25),
-    ]
+    num_mds = 100
+    hub_count = int(num_mds * 0.40)
+    corridor_count = int(num_mds * 0.36)
+    grid_count = num_mds - hub_count - corridor_count
+
+    hubs = np.array([
+        [500.0, 500.0],
+        [1500.0, 500.0],
+        [500.0, 1500.0],
+        [1500.0, 1500.0]
+    ])
+
+    corridor_starts = np.array([
+        [500.0, 500.0],
+        [500.0, 1500.0],
+        [500.0, 500.0],
+        [1500.0, 500.0],
+        [500.0, 500.0],
+    ])
+    corridor_ends = np.array([
+        [1500.0, 500.0],
+        [1500.0, 1500.0],
+        [500.0, 1500.0],
+        [1500.0, 1500.0],
+        [1500.0, 1500.0],
+    ])
+
     md_xs, md_ys = [], []
-    for cx, cy, radius, count in md_clusters:
-        angles = rng.uniform(0, 2 * np.pi, count)
-        rads = rng.normal(0, radius * 0.45, count)
-        md_xs.extend(np.clip(cx + rads * np.cos(angles), 50, MAP_BOUND - 50))
-        md_ys.extend(np.clip(cy + rads * np.sin(angles), 50, MAP_BOUND - 50))
+
+    # 1. Urban Hubs
+    for i in range(hub_count):
+        h_idx = i % 4
+        x = hubs[h_idx, 0] + rng.normal(0, 130.0)
+        y = hubs[h_idx, 1] + rng.normal(0, 130.0)
+        md_xs.append(np.clip(x, 50, MAP_BOUND - 50))
+        md_ys.append(np.clip(y, 50, MAP_BOUND - 50))
+
+    # 2. Corridors
+    for i in range(corridor_count):
+        c_idx = i % 5
+        t = rng.uniform(0.0, 1.0)
+        lateral = rng.normal(0, 35.0)
+        dx = corridor_ends[c_idx, 0] - corridor_starts[c_idx, 0]
+        dy = corridor_ends[c_idx, 1] - corridor_starts[c_idx, 1]
+        length = np.hypot(dx, dy)
+        norm_x = -dy / length
+        norm_y = dx / length
+        x = corridor_starts[c_idx, 0] + t * dx + lateral * norm_x
+        y = corridor_starts[c_idx, 1] + t * dy + lateral * norm_y
+        md_xs.append(np.clip(x, 50, MAP_BOUND - 50))
+        md_ys.append(np.clip(y, 50, MAP_BOUND - 50))
+
+    # 3. Peripheral Grid
+    cell_w = MAP_BOUND / 5.0
+    cell_h = MAP_BOUND / 5.0
+    for i in range(grid_count):
+        gx = i % 5
+        gy = (i // 5) % 5
+        x = (gx + 0.15 + 0.70 * rng.uniform(0.0, 1.0)) * cell_w
+        y = (gy + 0.15 + 0.70 * rng.uniform(0.0, 1.0)) * cell_h
+        md_xs.append(np.clip(x, 50, MAP_BOUND - 50))
+        md_ys.append(np.clip(y, 50, MAP_BOUND - 50))
+
     mds = np.column_stack((md_xs, md_ys))
 
     # 30 UAV initial positions scattered across map
-    uav_starts = rng.uniform(100, MAP_BOUND - 100, size=(30, 2))
+    uav_starts = rng.uniform(150, MAP_BOUND - 150, size=(30, 2))
     return mds, uav_starts
 
 
@@ -81,7 +135,7 @@ def simulate_ppo_trajectories(mds, uav_starts, steps: int = 60):
     for idx in sample_indices:
         pos = np.array(uav_starts[idx], dtype=float)
         path = [pos.copy()]
-        cov_rad = 90.0
+        cov_rad = 110.0
         for _ in range(steps):
             # Compute MD density vector towards nearby devices
             diffs = mds - pos
@@ -102,12 +156,12 @@ def simulate_ppo_trajectories(mds, uav_starts, steps: int = 60):
 def simulate_car_trajectories(mds, uav_starts):
     """Simulates CAR adaptive region partitioning, cluster centroids, and pointer-net tour routes."""
     rng = np.random.default_rng(101)
-    # Define 4 partitioned clusters matching Otsu / density regions
+    # Define 4 partitioned clusters matching the 4 realistic urban hubs
     cluster_centers = [
-        np.array([420.0, 480.0]),
-        np.array([1520.0, 430.0]),
-        np.array([1420.0, 1480.0]),
-        np.array([530.0, 1520.0]),
+        np.array([500.0, 500.0]),
+        np.array([1500.0, 500.0]),
+        np.array([1500.0, 1500.0]),
+        np.array([500.0, 1500.0]),
     ]
     uav_tours = []
     sample_uavs = [(1, 0), (8, 1), (15, 2), (23, 3)]
@@ -115,12 +169,12 @@ def simulate_car_trajectories(mds, uav_starts):
         start_pos = uav_starts[uav_idx].copy()
         center = cluster_centers[cluster_idx]
         
-        # Cluster waypoints around centroid
+        # Cluster waypoints along demand corridors and around centroid
         wp_offsets = [
-            np.array([-90.0, -80.0]),
-            np.array([80.0, -100.0]),
-            np.array([110.0, 90.0]),
-            np.array([-60.0, 110.0]),
+            np.array([-110.0, -80.0]),
+            np.array([120.0, -90.0]),
+            np.array([130.0, 110.0]),
+            np.array([-80.0, 120.0]),
             np.array([0.0, 0.0]),
         ]
         waypoints = [center + off for off in wp_offsets]
@@ -137,7 +191,7 @@ def simulate_car_trajectories(mds, uav_starts):
             for t in np.linspace(0, 1, num_pts, endpoint=False):
                 path.append(p1 + t * (p2 - p1))
         path.append(tour_order[-1])
-        uav_tours.append((f"uav_{uav_idx}", path, waypoints, 85.0))
+        uav_tours.append((f"uav_{uav_idx}", path, waypoints, 110.0))
     return uav_tours, cluster_centers
 
 
