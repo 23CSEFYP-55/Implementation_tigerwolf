@@ -3,15 +3,15 @@
 FANET-MEC Cross-Trajectory and Cross-Scheduler Graph Generator.
 
 Performs a full Cartesian cross-product of:
-  Trajectory Algorithms: PPO, CAR, TACC
-  Task Allocations (Schedulers): DYNAMIC, MOGS, LEXICOGRAPHIC, BIDDING, MARL
-  (Total: 15 Combinations)
+  Trajectory Algorithms: PPO, CAR, TACC, AD_CAR
+  Task Allocations (Schedulers): DYNAMIC, MOGS, LEXICOGRAPHIC, BIDDING, MARL, AP_DYNAMIC
+  (Total: 24 Combinations)
 
 Organizes and reads simulation outputs from:
   results/by_trajectory/<TRAJECTORY>/<SCHEDULER>/run-<n>.log
 
 Generates:
-  - 3-panel comparative time-series plots (PPO | CAR | TACC side-by-side):
+  - 4-panel comparative time-series plots (PPO | CAR | TACC | AD-CAR side-by-side):
       1. throughput_comparison.png
       2. runtime_comparison.png
       3. utilization_comparison.png
@@ -23,6 +23,8 @@ Generates:
       9. slack_margin_comparison.png
   - Macro cross-product comparative bar chart:
       10. trajectory_cross_summary.png
+  - Dedicated Flagship Optimization Comparative Figure:
+      11. flagship_optimization_comparison.png
 """
 
 import os
@@ -40,13 +42,14 @@ RESULTS_DIR = os.path.join(PROJECT_DIR, "results", "by_trajectory")
 OUTPUT_DIR = os.path.join(PROJECT_DIR, "images", "benchmarks")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-TRAJECTORIES = ["PPO", "CAR", "TACC"]
+TRAJECTORIES = ["PPO", "CAR", "TACC", "AD_CAR"]
 SCHEDULERS = {
     "DYNAMIC": "#2ca02c",        # Green
     "MOGS": "#e377c2",           # Magenta/Pink
     "LEXICOGRAPHIC": "#17becf",  # Cyan
     "BIDDING": "#ff7f0e",        # Orange
-    "MARL": "#1f77b4"            # Blue
+    "MARL": "#1f77b4",           # Blue
+    "AP_DYNAMIC": "#d62728"      # Crimson / Red (Flagship Proposed)
 }
 
 FORCE_RUN = "--run" in sys.argv
@@ -168,17 +171,17 @@ def generate_graphs():
         ("slack", "Deadline Slack Margin", "Average Deadline Slack Margin Over Time", "slack_margin_comparison.png", True),
     ]
 
-    console.print("[bold cyan]Rendering 3-Panel Side-by-Side Comparative Figures...[/bold cyan]")
+    console.print("[bold cyan]Rendering 4-Panel Side-by-Side Comparative Figures...[/bold cyan]")
 
     for key, ylabel, title, filename, include_all in metrics_to_plot:
-        fig, axs = plt.subplots(1, 3, figsize=(18, 5.5), sharey=True, dpi=200)
-        plt.subplots_adjust(wspace=0.15, left=0.06, right=0.96, top=0.86, bottom=0.12)
+        fig, axs = plt.subplots(1, 4, figsize=(24, 5.5), sharey=True, dpi=200)
+        plt.subplots_adjust(wspace=0.15, left=0.05, right=0.97, top=0.86, bottom=0.12)
         
         # Calculate global y-bounds for honest comparison across panels
         all_vals = []
         for traj in TRAJECTORIES:
             for sched in SCHEDULERS.keys():
-                if not include_all and sched != "DYNAMIC":
+                if not include_all and sched not in ("DYNAMIC", "AP_DYNAMIC"):
                     continue
                 epochs = dataset[traj].get(sched, {}).get('epochs', [])
                 if epochs:
@@ -192,7 +195,13 @@ def generate_graphs():
 
         for col_idx, traj in enumerate(TRAJECTORIES):
             ax = axs[col_idx]
-            traj_label = f"TACC-AAV" if traj == "TACC" else f"{traj} Trajectory"
+            if traj == "TACC":
+                traj_label = "TACC-AAV"
+            elif traj == "AD_CAR":
+                traj_label = "AD-CAR (Proposed)"
+            else:
+                traj_label = f"{traj} Trajectory"
+
             ax.set_title(f"Trajectory: {traj_label}", fontsize=12, fontweight="bold", pad=8)
             ax.set_xlabel("Scheduling Cycle (Epoch)", fontsize=10)
             if col_idx == 0:
@@ -201,30 +210,32 @@ def generate_graphs():
             ax.set_ylim(y_min, y_max)
 
             for sched, color in SCHEDULERS.items():
-                if not include_all and sched != "DYNAMIC":
+                if not include_all and sched not in ("DYNAMIC", "AP_DYNAMIC"):
                     continue
                 epochs = dataset[traj].get(sched, {}).get('epochs', [])
                 if not epochs:
                     continue
                 y_series = [e[key] for e in epochs]
                 x_series = list(range(1, len(y_series) + 1))
-                ax.plot(x_series, y_series, label=sched, color=color, linewidth=1.6)
+                lw = 2.2 if sched == "AP_DYNAMIC" else 1.5
+                ls = "-" if sched in ("DYNAMIC", "AP_DYNAMIC") else "--"
+                ax.plot(x_series, y_series, label=sched, color=color, linewidth=lw, linestyle=ls)
 
-            if col_idx == 2:
+            if col_idx == 3:
                 ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
 
         fig.suptitle(f"{title} (Cross-Trajectory Comparison)", fontsize=14, fontweight="bold", y=0.96)
         out_file = os.path.join(OUTPUT_DIR, filename)
         plt.savefig(out_file, dpi=200)
         plt.close()
-        console.print(f"  [green]✓[/green] Saved 3-panel cross-trajectory plot -> [bold]{filename}[/bold]")
+        console.print(f"  [green]✓[/green] Saved 4-panel cross-trajectory plot -> [bold]{filename}[/bold]")
 
     # ------------------------------------------------------------------
     # Macro Cross-Product Summary Chart (trajectory_cross_summary.png)
     # ------------------------------------------------------------------
     console.print("\n[bold cyan]Rendering Macro Cross-Product Summary Bar Chart...[/bold cyan]")
-    fig, axs = plt.subplots(2, 2, figsize=(16, 11), dpi=200)
-    plt.subplots_adjust(hspace=0.32, wspace=0.18, left=0.07, right=0.96, top=0.92, bottom=0.08)
+    fig, axs = plt.subplots(2, 2, figsize=(18, 12), dpi=200)
+    plt.subplots_adjust(hspace=0.32, wspace=0.18, left=0.06, right=0.96, top=0.92, bottom=0.08)
     
     kpis = [
         ("success_rate", "Scheduling Success Rate (%)", "Scheduling Success Rate by Trajectory & Allocation", axs[0, 0]),
@@ -234,22 +245,21 @@ def generate_graphs():
     ]
     
     x = np.arange(len(TRAJECTORIES))
-    width = 0.15  # Width of each scheduler bar
+    width = 0.13  # Width of each scheduler bar (6 schedulers)
     
     for metric_key, ylabel, panel_title, ax in kpis:
         ax.set_title(panel_title, fontsize=12, fontweight="bold", pad=8)
         ax.set_ylabel(ylabel, fontsize=10)
         ax.set_xticks(x)
-        ax.set_xticklabels([f"TACC-AAV" if t == "TACC" else f"{t}" for t in TRAJECTORIES], fontsize=11, fontweight="bold")
+        ax.set_xticklabels([f"TACC-AAV" if t == "TACC" else (f"AD-CAR\n(Proposed)" if t == "AD_CAR" else f"{t}") for t in TRAJECTORIES], fontsize=10.5, fontweight="bold")
         ax.grid(True, linestyle="--", alpha=0.5, axis='y')
         
         for idx, (sched, color) in enumerate(SCHEDULERS.items()):
-            offset = (idx - 2) * width
+            offset = (idx - 2.5) * width
             vals = []
             for traj in TRAJECTORIES:
                 summary = dataset[traj].get(sched, {}).get('summary', {})
                 val = summary.get(metric_key, 0.0)
-                # Fallback to epoch average if summary string wasn't emitted
                 if val == 0.0 and metric_key in ('fairness', 'slack'):
                     epochs = dataset[traj].get(sched, {}).get('epochs', [])
                     if epochs:
@@ -257,25 +267,82 @@ def generate_graphs():
                 vals.append(val)
             
             bars = ax.bar(x + offset, vals, width, label=sched, color=color, edgecolor="black", alpha=0.88)
-            # Label bar tops
             for bar in bars:
                 h = bar.get_height()
                 fmt = f"{h:.1f}%" if "Rate" in ylabel else (f"{h:.3f}" if h < 1.0 else f"{h:.2f}")
                 ax.annotate(fmt,
                             xy=(bar.get_x() + bar.get_width() / 2, h),
                             xytext=(0, 3), textcoords="offset points",
-                            ha='center', va='bottom', fontsize=7.5, rotation=0)
+                            ha='center', va='bottom', fontsize=6.8, rotation=45)
 
-        ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
+        ax.legend(loc="upper right", fontsize=8.0, framealpha=0.9)
 
-    fig.suptitle("Full Cross-Multiplication Benchmark Summary (3 Trajectories × 5 Schedulers)", fontsize=15, fontweight="bold", y=0.97)
+    fig.suptitle("Full Cross-Multiplication Benchmark Summary (4 Trajectories × 6 Schedulers = 24 Configurations)", fontsize=15, fontweight="bold", y=0.97)
     summary_path = os.path.join(OUTPUT_DIR, "trajectory_cross_summary.png")
     plt.savefig(summary_path, dpi=200)
     plt.close()
     console.print(f"  [bold green]✓ Saved macro cross-summary chart -> trajectory_cross_summary.png[/bold green]\n")
 
+    # ------------------------------------------------------------------
+    # Dedicated Flagship Optimization Comparison (flagship_optimization_comparison.png)
+    # ------------------------------------------------------------------
+    console.print("[bold cyan]Rendering Dedicated Flagship Optimization Comparison...[/bold cyan]")
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5.5), dpi=200)
+    plt.subplots_adjust(wspace=0.22, left=0.06, right=0.96, top=0.84, bottom=0.15)
+
+    combos_to_compare = [
+        ("CAR + DYNAMIC\n(Base)", "CAR", "DYNAMIC", "#2ca02c"),
+        ("CAR + LEX\n(Prev Peak)", "CAR", "LEXICOGRAPHIC", "#17becf"),
+        ("TACC + DYNAMIC\n(Safe Slack)", "TACC", "DYNAMIC", "#9467bd"),
+        ("AD-CAR + AP-DYN\n(Proposed Flagship)", "AD_CAR", "AP_DYNAMIC", "#d62728"),
+    ]
+
+    names = [c[0] for c in combos_to_compare]
+    colors = [c[3] for c in combos_to_compare]
+
+    # Panel 1: Success Rate (%)
+    succ_vals = [dataset[c[1]][c[2]]['summary'].get('success_rate', 0.0) for c in combos_to_compare]
+    bars1 = axs[0].bar(names, succ_vals, color=colors, edgecolor="black", alpha=0.88, width=0.55)
+    axs[0].set_title("(a) Scheduling Success Rate (%)", fontsize=12, fontweight="bold", pad=8)
+    axs[0].set_ylabel("Success Rate (%)", fontsize=10)
+    axs[0].grid(True, linestyle="--", alpha=0.5, axis='y')
+    for b in bars1:
+        h = b.get_height()
+        axs[0].annotate(f"{h:.2f}%", xy=(b.get_x() + b.get_width()/2, h), xytext=(0, 4),
+                        textcoords="offset points", ha='center', va='bottom', fontsize=9.5, fontweight="bold")
+
+    # Panel 2: Scheduling Runtime Overhead (ms) - Log scale for clear speedup view
+    rt_vals = [dataset[c[1]][c[2]]['summary'].get('overhead_ms', 0.0) for c in combos_to_compare]
+    bars2 = axs[1].bar(names, rt_vals, color=colors, edgecolor="black", alpha=0.88, width=0.55)
+    axs[1].set_title("(b) Scheduling Runtime Overhead (ms)", fontsize=12, fontweight="bold", pad=8)
+    axs[1].set_ylabel("Overhead (ms per batch)", fontsize=10)
+    axs[1].grid(True, linestyle="--", alpha=0.5, axis='y')
+    for b in bars2:
+        h = b.get_height()
+        axs[1].annotate(f"{h:.3f} ms", xy=(b.get_x() + b.get_width()/2, h), xytext=(0, 4),
+                        textcoords="offset points", ha='center', va='bottom', fontsize=9.5, fontweight="bold")
+
+    # Panel 3: Swarm Workload Balance (Jain's Fairness Index)
+    fair_vals = [dataset[c[1]][c[2]]['summary'].get('fairness', 0.0) for c in combos_to_compare]
+    bars3 = axs[2].bar(names, fair_vals, color=colors, edgecolor="black", alpha=0.88, width=0.55)
+    axs[2].set_title("(c) Swarm Workload Balancing (Jain's Index)", fontsize=12, fontweight="bold", pad=8)
+    axs[2].set_ylabel("Jain's Fairness Index", fontsize=10)
+    axs[2].set_ylim(0.0, 1.05)
+    axs[2].grid(True, linestyle="--", alpha=0.5, axis='y')
+    for b in bars3:
+        h = b.get_height()
+        axs[2].annotate(f"{h:.3f}", xy=(b.get_x() + b.get_width()/2, h), xytext=(0, 4),
+                        textcoords="offset points", ha='center', va='bottom', fontsize=9.5, fontweight="bold")
+
+    fig.suptitle("Flagship Optimization Breakthrough: AD-CAR Trajectory + AP-DYNAMIC Scheduler vs Baselines",
+                 fontsize=14, fontweight="bold", y=0.96)
+    flagship_path = os.path.join(OUTPUT_DIR, "flagship_optimization_comparison.png")
+    plt.savefig(flagship_path, dpi=200)
+    plt.close()
+    console.print(f"  [bold green]✓ Saved flagship optimization chart -> flagship_optimization_comparison.png[/bold green]\n")
+
     # Print summary table in terminal
-    tbl = Table(title="Trajectory x Scheduler Cross-Product Benchmark Summary", show_header=True)
+    tbl = Table(title="Complete Trajectory x Scheduler Benchmark Summary (24 Combinations)", show_header=True)
     tbl.add_column("Trajectory", style="bold magenta")
     tbl.add_column("Scheduler", style="cyan")
     tbl.add_column("Success Rate (%)", justify="right")
@@ -290,7 +357,8 @@ def generate_graphs():
             ov = summary.get('overhead_ms', 0.0)
             fa = summary.get('fairness', 0.0)
             sl = summary.get('slack', 0.0)
-            tbl.add_row(traj, sched, f"{sr:.2f}%", f"{ov:.4f}", f"{fa:.4f}", f"{sl:.4f}")
+            style = "bold green" if (traj == "AD_CAR" and sched == "AP_DYNAMIC") else None
+            tbl.add_row(traj, sched, f"{sr:.2f}%", f"{ov:.4f}", f"{fa:.4f}", f"{sl:.4f}", style=style)
 
     console.print(tbl)
 
