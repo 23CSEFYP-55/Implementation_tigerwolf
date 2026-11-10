@@ -65,6 +65,14 @@ public class FANETSimulation {
             trajectoryType = args[1];
         }
         
+        if (args.length > 2 && !args[2].trim().isEmpty()) {
+            try {
+                numUAVs = Integer.parseInt(args[2].trim());
+            } catch (Exception e) {
+                numUAVs = 30;
+            }
+        }
+        
         Log.printLine("========== Starting FANET Simulation with " + schedulerType
                 + " Scheduler / " + trajectoryType + " Trajectory ==========");
 
@@ -81,8 +89,7 @@ public class FANETSimulation {
             Application application = createApplication(appId, broker.getId());
             application.setUserId(broker.getId());
 
-            // Dynamic UAV count between 2 and 30
-            numUAVs = 30;
+            // Dynamic UAV count configured
             System.out.println("Dynamically spawning " + numUAVs + " UAVs...");
 
             Log.disable(); // Directive 1: Silence Default Logging (Noise Reduction)
