@@ -50,12 +50,13 @@ from rich.table import Table
 SERVERS = {
     "PPO": ("ppo_agent/tf_ppo_server.py", 5500),
     "CAR": ("ppo_agent/car_ppo_server.py", 5510),
+    "AD_CAR": ("ppo_agent/car_ppo_server.py", 5510),
     "MARL": ("ppo_agent/marl_allocation_server.py", 5501),
     "TACC": ("ppo_agent/tacc_aav_server.py", 5530),
 }
 
-SCHEDULERS = ["MOGS", "LEXICOGRAPHIC", "BIDDING", "MARL", "DYNAMIC"]
-TRAJECTORIES = ["PPO", "CAR", "TACC"]
+SCHEDULERS = ["MOGS", "LEXICOGRAPHIC", "BIDDING", "MARL", "DYNAMIC", "AP_DYNAMIC"]
+TRAJECTORIES = ["PPO", "CAR", "TACC", "AD_CAR"]
 
 JAVA_CP = f"out/production/iFogSim:jars/*:jars/commons-math3-3.5/*"
 

@@ -100,6 +100,8 @@ public class FANETSimulation {
                 masterController.setTaskScheduler(new org.fog.fanet.BiddingScheduler());
             } else if (schedulerType.equalsIgnoreCase("MARL")) {
                 masterController.setTaskScheduler(new org.fog.fanet.MARLScheduler());
+            } else if (schedulerType.equalsIgnoreCase("AP_DYNAMIC") || schedulerType.equalsIgnoreCase("APDYNAMIC")) {
+                masterController.setTaskScheduler(new org.fog.fanet.APDynamicScheduler());
             } else {
                 masterController.setTaskScheduler(new org.fog.fanet.DynamicRepairScheduler());
             }
@@ -119,6 +121,8 @@ public class FANETSimulation {
             org.fog.fanet.TrajectoryModel trajectoryModel;
             if (trajectoryType.equalsIgnoreCase("CAR")) {
                 trajectoryModel = new org.fog.fanet.CarTrajectoryModel();
+            } else if (trajectoryType.equalsIgnoreCase("AD_CAR") || trajectoryType.equalsIgnoreCase("ADCAR")) {
+                trajectoryModel = new org.fog.fanet.ADCarTrajectoryModel();
             } else if (trajectoryType.equalsIgnoreCase("TACC") || trajectoryType.equalsIgnoreCase("TACC_AAV")) {
                 trajectoryModel = new org.fog.fanet.TACCAAVTrajectoryModel();
             } else {

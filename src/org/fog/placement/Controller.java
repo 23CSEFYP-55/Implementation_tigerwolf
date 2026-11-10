@@ -492,6 +492,11 @@ public class Controller extends SimEntity {
 			rqLen = drs.getTotalRepairQueueLength(); // Cumulative, but can be plotted
 			inv = drs.getTotalInvalidAssignments();
 			re = drs.getTotalReassignedTasks();
+		} else if (taskScheduler instanceof org.fog.fanet.APDynamicScheduler) {
+			org.fog.fanet.APDynamicScheduler ap = (org.fog.fanet.APDynamicScheduler) taskScheduler;
+			rqLen = ap.getTotalRepairQueueLength();
+			inv = ap.getTotalInvalidAssignments();
+			re = ap.getTotalReassignedTasks();
 		}
 
 		System.out.println(String.format("[METRIC_EPOCH] Epoch:%d, Generated:%d, Scheduled:%d, Dropped:%d, RuntimeMs:%.4f, UavUtil:%.4f, CapUtil:%.4f, RepairQ:%d, Invalid:%d, Reassigned:%d, Fairness:%.4f, Churn:%.4f, Slack:%.4f",
