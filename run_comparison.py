@@ -8,6 +8,8 @@ from rich.panel import Panel
 console = Console()
 NUM_RUNS = 100
 
+SCHEDULERS = ["MOGS", "LEXICOGRAPHIC", "BIDDING", "MARL", "DYNAMIC"]
+
 def run_experiment(scheduler_type, progress, task_id):
     total_tasks_completed = []
     total_throughput_mb = []
@@ -17,6 +19,15 @@ def run_experiment(scheduler_type, progress, task_id):
     scheduling_success_rate = []
     average_scheduling_overhead_ms = []
     total_system_offloaded = []
+    
+    # New metrics
+    avg_uav_utilization = []
+    avg_capacity_utilization = []
+    avg_unassigned_tasks = []
+    avg_repair_queue = []
+    avg_invalid_assigns = []
+    avg_reassigned_tasks = []
+    avg_throughput_ratio = []
     
     for i in range(1, NUM_RUNS + 1):
         progress.update(task_id, description=f"[cyan]Running {scheduler_type} {i}/{NUM_RUNS}...")
@@ -35,6 +46,16 @@ def run_experiment(scheduler_type, progress, task_id):
         overhead_match = re.search(r"Average Scheduling Overhead\s*:\s*([\d.]+)", output)
         offload_match = re.search(r"System Total Offloaded Tasks\s*:\s*(\d+)", output)
         
+        # Parse new benchmark metrics
+        uav_util_match = re.search(r"│ Average UAV Utilization\s*│\s*([\d.]+)\s*│", output)
+        cap_util_match = re.search(r"│ Average Capacity Util\s*│\s*([\d.]+)\s*│", output)
+        unassigned_match = re.search(r"│ Average Unassigned Tasks\s*│\s*([\d.]+)\s*│", output)
+        throughput_ratio_match = re.search(r"│ Average Throughput\s*│\s*([\d.]+)\s*│", output)
+        
+        repair_match = re.search(r"│ Average Repair Queue\s*│\s*([\d.]+)\s*│", output)
+        invalid_match = re.search(r"│ Average Invalid Assigns\s*│\s*([\d.]+)\s*│", output)
+        reassigned_match = re.search(r"│ Average Reassigned Tasks\s*│\s*([\d.]+)\s*│", output)
+        
         if tasks_match and throughput_match and latency_match and dropped_match and success_rate_match and overhead_match and offload_match:
             total_tasks_completed.append(int(tasks_match.group(1)))
             total_throughput_mb.append(float(throughput_match.group(1)))
@@ -43,28 +64,56 @@ def run_experiment(scheduler_type, progress, task_id):
             scheduling_success_rate.append(float(success_rate_match.group(1)))
             average_scheduling_overhead_ms.append(float(overhead_match.group(1)))
             total_system_offloaded.append(int(offload_match.group(1)))
+            
+        if uav_util_match and cap_util_match and unassigned_match and throughput_ratio_match:
+            avg_uav_utilization.append(float(uav_util_match.group(1)))
+            avg_capacity_utilization.append(float(cap_util_match.group(1)))
+            avg_unassigned_tasks.append(float(unassigned_match.group(1)))
+            avg_throughput_ratio.append(float(throughput_ratio_match.group(1)))
+            
+        if scheduler_type == "DYNAMIC":
+            if repair_match: avg_repair_queue.append(float(repair_match.group(1)))
+            if invalid_match: avg_invalid_assigns.append(float(invalid_match.group(1)))
+            if reassigned_match: avg_reassigned_tasks.append(float(reassigned_match.group(1)))
         
         progress.advance(task_id)
     
     # Calculate averages
     if total_tasks_completed:
-        return {
+        results = {
             'tasks': sum(total_tasks_completed) / len(total_tasks_completed),
-            'throughput': sum(total_throughput_mb) / len(total_throughput_mb),
+            'throughput_mb': sum(total_throughput_mb) / len(total_throughput_mb),
             'latency': sum(average_latency_ms) / len(average_latency_ms),
             'dropped': sum(total_tasks_dropped) / len(total_tasks_dropped),
             'succ_rate': sum(scheduling_success_rate) / len(scheduling_success_rate),
             'overhead': sum(average_scheduling_overhead_ms) / len(average_scheduling_overhead_ms),
-            'offloads': sum(total_system_offloaded) / len(total_system_offloaded)
+            'offloads': sum(total_system_offloaded) / len(total_system_offloaded),
+            'uav_util': sum(avg_uav_utilization) / max(1, len(avg_uav_utilization)),
+            'cap_util': sum(avg_capacity_utilization) / max(1, len(avg_capacity_utilization)),
+            'unassigned': sum(avg_unassigned_tasks) / max(1, len(avg_unassigned_tasks)),
+            'throughput_ratio': sum(avg_throughput_ratio) / max(1, len(avg_throughput_ratio))
         }
+        
+        if scheduler_type == "DYNAMIC":
+            results['repair_queue'] = sum(avg_repair_queue) / max(1, len(avg_repair_queue))
+            results['invalid_assigns'] = sum(avg_invalid_assigns) / max(1, len(avg_invalid_assigns))
+            results['reassigned'] = sum(avg_reassigned_tasks) / max(1, len(avg_reassigned_tasks))
+        else:
+            results['repair_queue'] = 0.0
+            results['invalid_assigns'] = 0.0
+            results['reassigned'] = 0.0
+            
+        return results
     return None
 
 def main():
     console.print(Panel("[bold green]iFogSim FANET Scheduler Benchmarking[/bold green]\nStarting comparative analysis of task scheduling algorithms.", expand=False))
     
     with console.status("[bold yellow]Compiling Java source...") as status:
-        subprocess.run(["javac", "--release", "25", "-d", "out/production/iFogSim", "-cp", "jars/*:jars/commons-math3-3.5/*", "-sourcepath", "src", "src/org/fog/test/perfeval/FANETSimulation.java"], check=True)
+        subprocess.run(["javac", "--release", "21", "-d", "out/production/iFogSim", "-cp", "jars/*:jars/commons-math3-3.5/*", "-sourcepath", "src", "src/org/fog/test/perfeval/FANETSimulation.java"], check=True)
         status.update("[bold green]Compilation successful!")
+    
+    all_results = {}
     
     with Progress(
         SpinnerColumn(),
@@ -75,58 +124,52 @@ def main():
         console=console,
     ) as progress:
         
-        task_mogs = progress.add_task("[cyan]Starting MOGS...", total=NUM_RUNS)
-        task_dynamic = progress.add_task("[magenta]Starting DYNAMIC...", total=NUM_RUNS)
-        
-        mogs_results = run_experiment("MOGS", progress, task_mogs)
-        progress.update(task_mogs, description="[green]MOGS Complete!")
-        
-        dynamic_results = run_experiment("DYNAMIC", progress, task_dynamic)
-        progress.update(task_dynamic, description="[green]DYNAMIC Complete!")
+        tasks = {}
+        for sched in SCHEDULERS:
+            tasks[sched] = progress.add_task(f"[cyan]Starting {sched}...", total=NUM_RUNS)
+            
+        for sched in SCHEDULERS:
+            res = run_experiment(sched, progress, tasks[sched])
+            if res:
+                all_results[sched] = res
+            progress.update(tasks[sched], description=f"[green]{sched} Complete!")
         
     console.print()
     
-    if mogs_results and dynamic_results:
+    if all_results:
         table = Table(title=f"FINAL BENCHMARK COMPARISON ({NUM_RUNS} RUNS EACH)", show_header=True, header_style="bold magenta")
         table.add_column("Metric", style="dim", width=25)
-        table.add_column("MOGS (Baseline)", justify="right")
-        table.add_column("DYNAMIC REPAIR (New)", justify="right")
-        table.add_column("Diff", justify="right")
+        for sched in SCHEDULERS:
+            table.add_column(sched, justify="right")
         
         metrics = [
             ('Success Rate (%)', 'succ_rate', '{:.2f}'),
+            ('Throughput Ratio', 'throughput_ratio', '{:.4f}'),
             ('Sched Overhead (ms)', 'overhead', '{:.4f}'),
             ('Average Latency (ms)', 'latency', '{:.2f}'),
             ('Tasks Completed', 'tasks', '{:.2f}'),
-            ('Throughput (MB)', 'throughput', '{:.4f}'),
+            ('Data Processed (MB)', 'throughput_mb', '{:.4f}'),
             ('Tasks Dropped', 'dropped', '{:.2f}'),
-            ('P2P Offloads', 'offloads', '{:.2f}')
+            ('P2P Offloads', 'offloads', '{:.2f}'),
+            ('UAV Utilization', 'uav_util', '{:.4f}'),
+            ('Capacity Utilization', 'cap_util', '{:.4f}'),
+            ('Unassigned Tasks (Queue)', 'unassigned', '{:.2f}'),
+            ('Repair Queue Length', 'repair_queue', '{:.2f}'),
+            ('Invalid Assignments', 'invalid_assigns', '{:.2f}'),
+            ('Reassigned Tasks', 'reassigned', '{:.2f}')
         ]
         
         for label, key, format_str in metrics:
-            m_val = mogs_results[key]
-            d_val = dynamic_results[key]
-            diff = d_val - m_val
-            
-            diff_str = f"{diff:+.4f}" if "overhead" in key or "throughput" in key else f"{diff:+.2f}"
-            
-            # Color coding for Diff
-            if "overhead" in key or "latency" in key or "dropped" in key:
-                # Lower is better
-                color = "green" if diff < 0 else "red" if diff > 0 else "white"
-            else:
-                # Higher is better
-                color = "green" if diff > 0 else "red" if diff < 0 else "white"
-                
-            diff_str = f"[{color}]{diff_str}[/{color}]"
-            
-            table.add_row(label, format_str.format(m_val), format_str.format(d_val), diff_str)
+            row = [label]
+            for sched in SCHEDULERS:
+                val = all_results.get(sched, {}).get(key, 0.0)
+                if ("repair" in key or "invalid" in key or "reassigned" in key) and sched != "DYNAMIC":
+                    row.append("N/A")
+                else:
+                    row.append(format_str.format(val))
+            table.add_row(*row)
             
         console.print(table)
-        
-        speedup = mogs_results['overhead'] / dynamic_results['overhead']
-        console.print(f"\n[bold]Speedup Factor (Overhead):[/bold] [bold green]{speedup:.2f}x[/bold green]")
-        
     else:
         console.print("[bold red]Failed to gather complete benchmark data.[/bold red]")
 

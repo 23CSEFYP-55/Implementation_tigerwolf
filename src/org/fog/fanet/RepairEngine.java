@@ -46,8 +46,10 @@ public class RepairEngine {
 
     /**
      * Attempts to assign tasks from the repair queue (invalid + new).
+     * Returns the number of tasks that were reassigned.
      */
-    public void assignNewTasks(Queue<Tuple> repairQueue, List<FogDevice> uavs) {
+    public long assignNewTasks(Queue<Tuple> repairQueue, List<FogDevice> uavs) {
+        long reassignedCount = 0;
         Map<Integer, FogDevice> uavMap = new HashMap<>();
         for (FogDevice uav : uavs) {
             uavMap.put(uav.getId(), uav);
@@ -55,6 +57,9 @@ public class RepairEngine {
 
         while (!repairQueue.isEmpty()) {
             Tuple task = repairQueue.poll();
+            if (task.assignedUavId != null) {
+                reassignedCount++;
+            }
             task.assignedUavId = null; // Reset previous assignment if any
 
             FogDevice bestUav = findBestUAV(task, uavs);
@@ -64,12 +69,14 @@ public class RepairEngine {
                 bestUav.acceptedTasks.add(task);
                 assignmentState.addTask(bestUav.getId(), task);
                 task.assignedUavId = bestUav.getId();
-                PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                GlobalState.accumulatedThroughput += task.tupleDataSize;
             } else {
                 // Attempt peer-to-peer offloading if direct assignment failed
                 attemptPeerOffload(task, uavs, uavMap);
             }
         }
+        
+        return reassignedCount;
     }
 
     /**
@@ -140,7 +147,7 @@ public class RepairEngine {
                         peer.acceptedTasks.add(task);
                         assignmentState.addTask(peer.getId(), task);
                         task.assignedUavId = peer.getId();
-                        PreferenceBuilder.accumulatedThroughput += task.tupleDataSize;
+                        GlobalState.accumulatedThroughput += task.tupleDataSize;
                         bridgeUav.tasksOffloaded++; // Increment offloaded count
                         return; // Offload successful
                     }
