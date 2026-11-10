@@ -95,4 +95,4 @@ for i in {1..25}; do
 done
 
 cd "$PROJECT_DIR"
-java -cp "out/production/iFogSim:jars/*:jars/commons-math3-3.5/*" org.fog.test.perfeval.FANETSimulation "$SCHED" "$TRAJ" "${3:-30}" "${4:-800}"
+java -cp "out/production/iFogSim:jars/*:jars/commons-math3-3.5/*" org.fog.test.perfeval.FANETSimulation "$SCHED" "$TRAJ" "${3:-30}" "${4:-100}"

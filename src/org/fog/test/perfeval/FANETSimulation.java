@@ -48,7 +48,7 @@ public class FANETSimulation {
 
     // Application, UAV count, and HARD LIMITS
     static int numUAVs = 30;
-    static int NUM_MDS = 800; // 800 MDs default
+    static int NUM_MDS = 100; // 100 MDs default
     static double SENSOR_TRANSMISSION_TIME = 1000.0; // Mean time (lambda) for Poisson
 
     // --- Time Limit (extended to allow 100 epochs) ---
@@ -77,7 +77,7 @@ public class FANETSimulation {
             try {
                 NUM_MDS = Integer.parseInt(args[3].trim());
             } catch (Exception e) {
-                NUM_MDS = 800;
+                NUM_MDS = 100;
             }
         }
         
@@ -334,14 +334,15 @@ public class FANETSimulation {
             fogDevices.add(uav);
         }
 
-        // --- 800 GROUND SENSOR DEVICES (MDs) ---
+        // --- GROUND SENSOR DEVICES (MDs) WITH REALISTIC SPATIAL DISTRIBUTION ---
         for (int i = 0; i < NUM_MDS; i++) {
             FogDevice groundDevice = createFogDevice("ground_device_" + i, 1000, 1000, 10000, 270,
                     3, 0.0, 87.53, 82.44);
             // Standalone devices, task scheduler handles routing
             groundDevice.setParentId(-1); 
-            groundDevice.x_coord = rand.nextDouble() * 2000.0;
-            groundDevice.y_coord = rand.nextDouble() * 2000.0;
+            double[] coords = generateRealisticMDCoordinates(i, NUM_MDS, rand);
+            groundDevice.x_coord = coords[0];
+            groundDevice.y_coord = coords[1];
             fogDevices.add(groundDevice);
 
             // --- SENSOR (generates tasks via Poisson Process) ---
@@ -358,6 +359,69 @@ public class FANETSimulation {
             actuator.setLatency(1.0);
             actuators.add(actuator);
         }
+    }
+
+    /**
+     * Generates realistic, structured spatial coordinates for ground mobile devices:
+     * - 40% in 4 Urban Hubs (Gaussian clusters at (500,500), (1500,500), (500,1500), (1500,1500))
+     * - 36% along Arterial Transit Corridors connecting the hubs with lateral Gaussian deviation
+     * - 24% evenly dispersed across a low-discrepancy peripheral grid with jitter
+     */
+    private static double[] generateRealisticMDCoordinates(int index, int totalMds, java.util.Random rand) {
+        double x, y;
+        int hubCount = (int) (totalMds * 0.40);
+        int roadCount = (int) (totalMds * 0.36);
+
+        if (index < hubCount) {
+            // 1. Urban Hubs (4 balanced regional clusters)
+            double[][] hubs = {
+                {500.0, 500.0}, {1500.0, 500.0},
+                {500.0, 1500.0}, {1500.0, 1500.0}
+            };
+            double[] hub = hubs[index % 4];
+            x = hub[0] + rand.nextGaussian() * 130.0;
+            y = hub[1] + rand.nextGaussian() * 130.0;
+        } else if (index < hubCount + roadCount) {
+            // 2. Arterial Transit Roads (Corridors connecting hubs)
+            int roadId = (index - hubCount) % 5;
+            double t = rand.nextDouble(); // position along corridor [0, 1]
+            switch (roadId) {
+                case 0: // South Horizontal (500, 500) -> (1500, 500)
+                    x = 500.0 + t * 1000.0;
+                    y = 500.0 + rand.nextGaussian() * 35.0;
+                    break;
+                case 1: // North Horizontal (500, 1500) -> (1500, 1500)
+                    x = 500.0 + t * 1000.0;
+                    y = 1500.0 + rand.nextGaussian() * 35.0;
+                    break;
+                case 2: // West Vertical (500, 500) -> (500, 1500)
+                    x = 500.0 + rand.nextGaussian() * 35.0;
+                    y = 500.0 + t * 1000.0;
+                    break;
+                case 3: // East Vertical (1500, 500) -> (1500, 1500)
+                    x = 1500.0 + rand.nextGaussian() * 35.0;
+                    y = 500.0 + t * 1000.0;
+                    break;
+                default: // Central Diagonal crossing (500, 500) -> (1500, 1500)
+                    x = 500.0 + t * 1000.0 + rand.nextGaussian() * 35.0;
+                    y = 500.0 + t * 1000.0 + rand.nextGaussian() * 35.0;
+                    break;
+            }
+        } else {
+            // 3. Evenly Dispersed Low-Discrepancy Peripheral Grid with Jitter
+            int gridIdx = index - (hubCount + roadCount);
+            int gridSize = 5; // 5x5 grid
+            int gx = gridIdx % gridSize;
+            int gy = (gridIdx / gridSize) % gridSize;
+            double cellW = 2000.0 / gridSize; // 400m cells
+            x = (gx + 0.5) * cellW + (rand.nextDouble() - 0.5) * (cellW * 0.7);
+            y = (gy + 0.5) * cellW + (rand.nextDouble() - 0.5) * (cellW * 0.7);
+        }
+
+        // Clamp to map bounds
+        x = Math.max(50.0, Math.min(1950.0, x));
+        y = Math.max(50.0, Math.min(1950.0, y));
+        return new double[]{x, y};
     }
 
     /**
