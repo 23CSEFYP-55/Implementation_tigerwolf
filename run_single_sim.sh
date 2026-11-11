@@ -22,7 +22,7 @@ SCHED_UPPER=$(echo "$SCHED" | tr '[:lower:]' '[:upper:]')
 
 # Determine server and port by trajectory
 case "$TRAJ_UPPER" in
-    CAR|AD_CAR|ADCAR)
+    CAR|AD_CAR|ADCAR|HMET|H_MET)
         TRAJ_SERVER="$PROJECT_DIR/ppo_agent/car_ppo_server.py"
         TRAJ_PORT=5510
         ;;

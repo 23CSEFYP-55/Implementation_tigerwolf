@@ -136,6 +136,8 @@ public class FANETSimulation {
             org.fog.fanet.TrajectoryModel trajectoryModel;
             if (trajectoryType.equalsIgnoreCase("CAR")) {
                 trajectoryModel = new org.fog.fanet.CarTrajectoryModel();
+            } else if (trajectoryType.equalsIgnoreCase("HMET") || trajectoryType.equalsIgnoreCase("H_MET")) {
+                trajectoryModel = new org.fog.fanet.HMETTrajectoryModel();
             } else if (trajectoryType.equalsIgnoreCase("AD_CAR") || trajectoryType.equalsIgnoreCase("ADCAR")) {
                 trajectoryModel = new org.fog.fanet.ADCarTrajectoryModel();
             } else if (trajectoryType.equalsIgnoreCase("TACC") || trajectoryType.equalsIgnoreCase("TACC_AAV")) {
