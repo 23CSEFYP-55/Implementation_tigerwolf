@@ -42,7 +42,7 @@ RESULTS_DIR = os.path.join(PROJECT_DIR, "results", "by_trajectory")
 OUTPUT_DIR = os.path.join(PROJECT_DIR, "images", "benchmarks")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-TRAJECTORIES = ["PPO", "CAR", "TACC", "AD_CAR"]
+TRAJECTORIES = ["PPO", "CAR", "TACC"]
 SCHEDULERS = {
     "DYNAMIC": "#2ca02c",        # Green
     "MOGS": "#e377c2",           # Magenta/Pink
@@ -171,11 +171,11 @@ def generate_graphs():
         ("slack", "Deadline Slack Margin", "Average Deadline Slack Margin Over Time", "slack_margin_comparison.png", True),
     ]
 
-    console.print("[bold cyan]Rendering 4-Panel Side-by-Side Comparative Figures...[/bold cyan]")
+    console.print("[bold cyan]Rendering 3-Panel Side-by-Side Comparative Figures...[/bold cyan]")
 
     for key, ylabel, title, filename, include_all in metrics_to_plot:
-        fig, axs = plt.subplots(1, 4, figsize=(24, 5.5), sharey=True, dpi=200)
-        plt.subplots_adjust(wspace=0.15, left=0.05, right=0.97, top=0.86, bottom=0.12)
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5.5), sharey=True, dpi=200)
+        plt.subplots_adjust(wspace=0.15, left=0.06, right=0.97, top=0.86, bottom=0.12)
         
         # Calculate global y-bounds for honest comparison across panels
         all_vals = []
@@ -197,8 +197,6 @@ def generate_graphs():
             ax = axs[col_idx]
             if traj == "TACC":
                 traj_label = "TACC-AAV"
-            elif traj == "AD_CAR":
-                traj_label = "AD-CAR (Proposed)"
             else:
                 traj_label = f"{traj} Trajectory"
 
@@ -221,14 +219,14 @@ def generate_graphs():
                 ls = "-" if sched in ("DYNAMIC", "AP_DYNAMIC") else "--"
                 ax.plot(x_series, y_series, label=sched, color=color, linewidth=lw, linestyle=ls)
 
-            if col_idx == 3:
+            if col_idx == 2:
                 ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
 
         fig.suptitle(f"{title} (Cross-Trajectory Comparison)", fontsize=14, fontweight="bold", y=0.96)
         out_file = os.path.join(OUTPUT_DIR, filename)
         plt.savefig(out_file, dpi=200)
         plt.close()
-        console.print(f"  [green]✓[/green] Saved 4-panel cross-trajectory plot -> [bold]{filename}[/bold]")
+        console.print(f"  [green]✓[/green] Saved 3-panel cross-trajectory plot -> [bold]{filename}[/bold]")
 
     # ------------------------------------------------------------------
     # Macro Cross-Product Summary Chart (trajectory_cross_summary.png)
@@ -251,7 +249,7 @@ def generate_graphs():
         ax.set_title(panel_title, fontsize=12, fontweight="bold", pad=8)
         ax.set_ylabel(ylabel, fontsize=10)
         ax.set_xticks(x)
-        ax.set_xticklabels([f"TACC-AAV" if t == "TACC" else (f"AD-CAR\n(Proposed)" if t == "AD_CAR" else f"{t}") for t in TRAJECTORIES], fontsize=10.5, fontweight="bold")
+        ax.set_xticklabels([f"TACC-AAV" if t == "TACC" else f"{t}" for t in TRAJECTORIES], fontsize=11, fontweight="bold")
         ax.grid(True, linestyle="--", alpha=0.5, axis='y')
         
         for idx, (sched, color) in enumerate(SCHEDULERS.items()):
@@ -277,7 +275,7 @@ def generate_graphs():
 
         ax.legend(loc="upper right", fontsize=8.0, framealpha=0.9)
 
-    fig.suptitle("Full Cross-Multiplication Benchmark Summary (4 Trajectories × 6 Schedulers = 24 Configurations)", fontsize=15, fontweight="bold", y=0.97)
+    fig.suptitle("Full Cross-Multiplication Benchmark Summary (3 Trajectories × 6 Schedulers = 18 Configurations)", fontsize=15, fontweight="bold", y=0.97)
     summary_path = os.path.join(OUTPUT_DIR, "trajectory_cross_summary.png")
     plt.savefig(summary_path, dpi=200)
     plt.close()
@@ -291,10 +289,11 @@ def generate_graphs():
     plt.subplots_adjust(wspace=0.22, left=0.06, right=0.96, top=0.84, bottom=0.15)
 
     combos_to_compare = [
-        ("CAR + DYNAMIC\n(Base)", "CAR", "DYNAMIC", "#2ca02c"),
-        ("CAR + LEX\n(Prev Peak)", "CAR", "LEXICOGRAPHIC", "#17becf"),
-        ("TACC + DYNAMIC\n(Safe Slack)", "TACC", "DYNAMIC", "#9467bd"),
-        ("AD-CAR + AP-DYN\n(Proposed Flagship)", "AD_CAR", "AP_DYNAMIC", "#d62728"),
+        ("CAR + DYNAMIC\n(Baseline)", "CAR", "DYNAMIC", "#2ca02c"),
+        ("CAR + MOGS\n(Gale-Shapley)", "CAR", "MOGS", "#e377c2"),
+        ("CAR + LEX\n(Previous Peak)", "CAR", "LEXICOGRAPHIC", "#17becf"),
+        ("CAR + MARL\n(Neural Baseline)", "CAR", "MARL", "#1f77b4"),
+        ("CAR + AP-DYN\n(Flagship Proposed)", "CAR", "AP_DYNAMIC", "#d62728"),
     ]
 
     names = [c[0] for c in combos_to_compare]
@@ -334,7 +333,7 @@ def generate_graphs():
         axs[2].annotate(f"{h:.3f}", xy=(b.get_x() + b.get_width()/2, h), xytext=(0, 4),
                         textcoords="offset points", ha='center', va='bottom', fontsize=9.5, fontweight="bold")
 
-    fig.suptitle("Flagship Optimization Breakthrough: AD-CAR Trajectory + AP-DYNAMIC Scheduler vs Baselines",
+    fig.suptitle("Flagship Optimization Breakthrough: CAR Trajectory + AP-DYNAMIC Scheduler vs Baselines",
                  fontsize=14, fontweight="bold", y=0.96)
     flagship_path = os.path.join(OUTPUT_DIR, "flagship_optimization_comparison.png")
     plt.savefig(flagship_path, dpi=200)
@@ -342,7 +341,7 @@ def generate_graphs():
     console.print(f"  [bold green]✓ Saved flagship optimization chart -> flagship_optimization_comparison.png[/bold green]\n")
 
     # Print summary table in terminal
-    tbl = Table(title="Complete Trajectory x Scheduler Benchmark Summary (24 Combinations)", show_header=True)
+    tbl = Table(title="Complete Trajectory x Scheduler Benchmark Summary (18 Combinations)", show_header=True)
     tbl.add_column("Trajectory", style="bold magenta")
     tbl.add_column("Scheduler", style="cyan")
     tbl.add_column("Success Rate (%)", justify="right")
@@ -357,7 +356,7 @@ def generate_graphs():
             ov = summary.get('overhead_ms', 0.0)
             fa = summary.get('fairness', 0.0)
             sl = summary.get('slack', 0.0)
-            style = "bold green" if (traj == "AD_CAR" and sched == "AP_DYNAMIC") else None
+            style = "bold green" if (traj == "CAR" and sched == "AP_DYNAMIC") else None
             tbl.add_row(traj, sched, f"{sr:.2f}%", f"{ov:.4f}", f"{fa:.4f}", f"{sl:.4f}", style=style)
 
     console.print(tbl)
