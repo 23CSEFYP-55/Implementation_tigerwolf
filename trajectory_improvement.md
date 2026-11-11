@@ -34,7 +34,7 @@ Code inspection and `[TRAJECTORY_EPOCH]` trace analysis of [`CarTrajectoryModel.
 
 ## 2. Verified Literature Foundations
 
-H-MET combines hierarchical global routing with local potential-field reaction, grounded in four verified IEEE references:
+H-MET combines hierarchical global routing with local potential-field reaction, grounded in two verified IEEE references:
 
 1. **Macro Routing Backbone (CAR Baseline):**  
    Guo et al., *"UAV Trajectory Optimization Based on Pointer Networks and Adaptive Region Partitioning,"* **IEEE Internet of Things Journal (IoT-J)**  
@@ -45,16 +45,6 @@ H-MET combines hierarchical global routing with local potential-field reaction, 
    Yuan et al., *"Novel Optimal Trajectory Design in UAV-Assisted Networks: A Mechanical Equivalence-Based Strategy,"* **IEEE Journal on Selected Areas in Communications (JSAC)**, 2021  
    DOI: <https://doi.org/10.1109/JSAC.2021.3088627>  
    *Contribution used:* Formulating ground user service pull as an equivalent local force vector acting orthogonally/elastically on global waypoint flight paths to maximize wireless service efficiency.
-
-3. **Heterogeneous Fleet Capability & Dwelling Awareness:**  
-   Liu et al., *"Joint Trajectory Design and Resource Allocation in UAV-Enabled Heterogeneous MEC Systems,"* **IEEE Internet of Things Journal (IoT-J)**, 2024  
-   DOI: <https://doi.org/10.1109/JIOT.2024.3414902>  
-   *Contribution used:* Adapting kinematics to heterogeneous UAV profiles (`coverageRadius` $\in [20, 140]\,\text{m}$, speed $v_i$) rather than uniform hovering assumptions.
-
-4. **Stochastic Online Joint Trajectory & Offloading Control:**  
-   Yang et al., *"Online Trajectory and Resource Optimization for Stochastic UAV-Enabled MEC Systems,"* **IEEE Transactions on Wireless Communications (TWC)**, 2022  
-   DOI: <https://doi.org/10.1109/TWC.2022.3142365>  
-   *Contribution used:* Decoupling slow periodic global planning ($2000\,\text{ms}$) from fast online kinematic correction ($10\,\text{ms}$) coupled with online task scheduling (`AP_DYNAMIC`).
 
 ---
 
@@ -207,3 +197,4 @@ Visualizing the exact logged `(x, y)` coordinates of the top 10 active UAVs high
    - *Recommended next step:* Add an optional `-Dsim.seed=<seed>` system property for paired $K$-seed Monte Carlo runs ($K \ge 5$) to establish tight confidence intervals in sparse swarm regimes.
 3. **Minor Comment-vs-Code Constant Cleanup:**
    - [`HMETTrajectoryModel.java`](src/org/fog/fanet/HMETTrajectoryModel.java#L22-L24) docblock lists legacy exploratory constants (`1.5 * Rcov`, `0.75x`, `1.20x`) whereas the active code uses `1.4 * coverageRadius`, `0.78x`, and `1.15x`. Sync this comment in the next cleanup commit.
+
